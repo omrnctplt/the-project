@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: small-model
+  labels:
+    app: small-model
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: small-model
+  template:
+    metadata:
+      labels:
+        app: small-model
+    spec:
+      containers:
+      - name: small-model
+        image: small-model:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8002
+        resources:
+          requests:
+            cpu: 200m
+            memory: 512Mi
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: small-model-service
+spec:
+  selector:
+    app: small-model
+  ports:
+    - protocol: TCP
+      port: 8002
+      targetPort: 8002
+  type: ClusterIP

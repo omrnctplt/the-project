@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: big-model
+  labels:
+    app: big-model
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: big-model
+  template:
+    metadata:
+      labels:
+        app: big-model
+    spec:
+      containers:
+      - name: big-model
+        image: big-model:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8001
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 2000m
+            memory: 4Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: big-model-service
+spec:
+  selector:
+    app: big-model
+  ports:
+    - protocol: TCP
+      port: 8001
+      targetPort: 8001
+  type: ClusterIP
