@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Sohbet{% endblock %}
+{% block content %}
+<section class="card">
+  <h1>Sohbet</h1>
+  <p class="muted">Sorgunuz departmaniza atanmis modele otomatik yonlendirilir. Yonetici hesabi spesifik model secebilir.</p>
+
+  <div id="adminPicker" class="hidden">
+    <label>Model (yonetici icin)
+      <select id="adminModel">
+        <option value="">(otomatik)</option>
+      </select>
+    </label>
+  </div>
+
+  <form id="chatForm">
+    <label>Prompt
+      <textarea id="prompt" rows="5" placeholder="Sorunuzu yazin..."></textarea>
+    </label>
+    <button type="submit" class="primary">Gonder</button>
+  </form>
+
+  <div id="chatLog" class="log"></div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script src="/static/chat.js"></script>
+{% endblock %}

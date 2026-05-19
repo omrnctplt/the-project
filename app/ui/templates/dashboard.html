@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Panel{% endblock %}
+{% block content %}
+<section class="card">
+  <h1>Sistem Durumu</h1>
+  <div id="readyBadge" class="badge">Bagleniyor...</div>
+  <div class="grid two">
+    <div>
+      <h3>Donanim</h3>
+      <table id="hwTable" class="kv"></table>
+    </div>
+    <div>
+      <h3>Kapasite Plani</h3>
+      <table id="capTable" class="kv"></table>
+    </div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Modeller</h2>
+  <table id="modelsTable" class="data">
+    <thead>
+      <tr>
+        <th>Model</th><th>Kategori</th><th>Durum</th><th>Indi</th>
+        <th>Aktif Istek</th><th>Toplam</th><th>Ort. Gecikme</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</section>
+
+<section class="card">
+  <h2>Sizin Kullaniminiz</h2>
+  <table id="usageTable" class="kv"></table>
+  <h3>Model Bazinda Dagilim</h3>
+  <table id="usageByModel" class="data">
+    <thead><tr><th>Model</th><th>Istek</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</section>
+{% endblock %}
+{% block scripts %}
+<script src="/static/dashboard.js"></script>
+{% endblock %}

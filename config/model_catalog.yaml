@@ -1,0 +1,169 @@
+# Mayis 2026 itibariyla guncel hafif modeller — hepsi Ollama Library'de mevcut.
+# Yeni model eklemek isterseniz vram_gb / ram_gb degerlerini dogru girin;
+# capacity planlayicisi donanim profiline gore otomatik aktif/pasif isaretler.
+
+defaults:
+  context_window: 4096
+  temperature: 0.6
+  warmup_on_start: false      # true ise compose up sonrasi modeller hemen yuklenir
+
+categories:
+  text:
+    description: "Metin, sozel, ozet, e-posta, sozlesme analizi"
+  code:
+    description: "Kod yazma, refactor, code review"
+  reasoning:
+    description: "Akil yurutme, matematik, multi-step problem"
+  fallback:
+    description: "Diger modeller mesgulken hizli ve hafif yanit"
+
+models:
+  # --------- Metin / sozel ---------
+  llama3.2-1b:
+    ollama_tag: "llama3.2:1b"
+    category: text
+    parameters_b: 1.2
+    ram_gb: 1.5
+    vram_gb: 1.5
+    profile: "Hizli, hafif metin yaniti. Meta Llama 3.2."
+
+  llama3.2-3b:
+    ollama_tag: "llama3.2:3b"
+    category: text
+    parameters_b: 3.2
+    ram_gb: 2.5
+    vram_gb: 2.5
+    profile: "Daha kapasiteli metin, ozet, sozlesme."
+
+  qwen2.5-1.5b:
+    ollama_tag: "qwen2.5:1.5b"
+    category: text
+    parameters_b: 1.5
+    ram_gb: 1.2
+    vram_gb: 1.2
+    profile: "Cok dilli, Turkce'de iyi, hizli."
+
+  qwen2.5-3b:
+    ollama_tag: "qwen2.5:3b"
+    category: text
+    parameters_b: 3.0
+    ram_gb: 2.4
+    vram_gb: 2.4
+    profile: "Genel amacli, Turkce, makul kalite."
+
+  gemma2-2b:
+    ollama_tag: "gemma2:2b"
+    category: text
+    parameters_b: 2.6
+    ram_gb: 2.0
+    vram_gb: 2.0
+    profile: "Google Gemma 2 — dengeli metin modeli."
+
+  # --------- Code ---------
+  qwen2.5-coder-1.5b:
+    ollama_tag: "qwen2.5-coder:1.5b"
+    category: code
+    parameters_b: 1.5
+    ram_gb: 1.2
+    vram_gb: 1.2
+    profile: "Hizli kod tamamlama, snippet, basit refactor."
+
+  qwen2.5-coder-3b:
+    ollama_tag: "qwen2.5-coder:3b"
+    category: code
+    parameters_b: 3.1
+    ram_gb: 2.5
+    vram_gb: 2.5
+    profile: "Orta seviye coding, fonksiyon uretimi."
+
+  qwen2.5-coder-7b:
+    ollama_tag: "qwen2.5-coder:7b"
+    category: code
+    parameters_b: 7.6
+    ram_gb: 5.0
+    vram_gb: 5.0
+    profile: "Tam coding asistani (refactor, code review)."
+
+  # --------- Reasoning ---------
+  deepseek-r1-1.5b:
+    ollama_tag: "deepseek-r1:1.5b"
+    category: reasoning
+    parameters_b: 1.5
+    ram_gb: 1.5
+    vram_gb: 1.5
+    profile: "Step-by-step reasoning, basit matematik."
+
+  deepseek-r1-7b:
+    ollama_tag: "deepseek-r1:7b"
+    category: reasoning
+    parameters_b: 7.0
+    ram_gb: 5.0
+    vram_gb: 5.0
+    profile: "Multi-step reasoning, analitik problemler."
+
+  # --------- Fallback ---------
+  qwen2.5-0.5b:
+    ollama_tag: "qwen2.5:0.5b"
+    category: fallback
+    parameters_b: 0.5
+    ram_gb: 0.5
+    vram_gb: 0.5
+    profile: "Cok hafif yedek model. Genelde her zaman hazir."
+
+departments:
+  hr:
+    label: "Insan Kaynaklari"
+    primary_category: text
+    allowed_categories: [text, fallback]
+    rate_limit_per_min: 30
+
+  engineering:
+    label: "Muhendislik / Yazilim"
+    primary_category: code
+    allowed_categories: [code, text, reasoning, fallback]
+    rate_limit_per_min: 60
+
+  legal:
+    label: "Hukuk"
+    primary_category: text
+    allowed_categories: [text, fallback]
+    rate_limit_per_min: 20
+
+  finance:
+    label: "Finans / Muhasebe"
+    primary_category: reasoning
+    allowed_categories: [reasoning, text, fallback]
+    rate_limit_per_min: 30
+
+  marketing:
+    label: "Pazarlama"
+    primary_category: text
+    allowed_categories: [text, fallback]
+    rate_limit_per_min: 30
+
+  general:
+    label: "Genel Kullanici"
+    primary_category: text
+    allowed_categories: [text, fallback]
+    rate_limit_per_min: 15
+
+# Kurallar yukaridan asagi degerlendirilir; ilk eslesen kazanir.
+# "@department_primary" tokeni o anki kullanicinin departman varsayilanini ifade eder.
+routing_rules:
+  - name: "Prompt'ta kod blogu / fonksiyon imzasi varsa coding modeli"
+    when:
+      prompt_matches: "```|\\bdef \\b|\\bfunction \\b|\\bclass \\b|\\bSELECT \\b|#include|=>|console\\.log"
+    then_category: code
+    priority: 100
+
+  - name: "Matematik / hesap iceren prompt reasoning'e"
+    when:
+      prompt_matches: "(?i)hesapla|formul|matematik|integral|turev|denklem|=\\s*\\?"
+    then_category: reasoning
+    priority: 80
+
+  - name: "Departman primary kategorisi"
+    when:
+      always: true
+    then_category: "@department_primary"
+    priority: 10

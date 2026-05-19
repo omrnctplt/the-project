@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{% block title %}On-Premise AI Gateway{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">●</span>
+      <span class="name">On-Premise AI Gateway</span>
+    </div>
+    <nav id="mainNav" class="hidden">
+      <a href="/ui/dashboard">Panel</a>
+      <a href="/ui/chat">Sohbet</a>
+      <a href="/ui/admin" data-admin-only>Yonetim</a>
+      <span class="spacer"></span>
+      <span class="user" id="navUser"></span>
+      <button id="logoutBtn" class="link">Cikis</button>
+    </nav>
+  </header>
+
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="footer">
+    <span>v0.1.0 &middot; <a href="/metrics" target="_blank">/metrics</a> &middot; <a href="/docs" target="_blank">API</a></span>
+  </footer>
+
+  <script src="/static/common.js"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

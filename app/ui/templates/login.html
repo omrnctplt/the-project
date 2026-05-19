@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Giris{% endblock %}
+{% block content %}
+<div class="card narrow">
+  <h1>Giris</h1>
+  <p class="muted">Departmaniza atanmis hesabinizla giris yapin. Demo amacli kullanicilar: <code>hr_user/hr123</code>, <code>dev_user/dev123</code>, <code>admin/admin</code>.</p>
+  <form id="loginForm">
+    <label>Kullanici adi
+      <input type="text" id="username" autocomplete="username" required />
+    </label>
+    <label>Sifre
+      <input type="password" id="password" autocomplete="current-password" required />
+    </label>
+    <button type="submit" class="primary">Giris yap</button>
+    <p id="loginError" class="error hidden"></p>
+  </form>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+  document.getElementById("mainNav").classList.add("hidden");
+  document.getElementById("loginForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const err = document.getElementById("loginError");
+    err.classList.add("hidden");
+    const username = document.getElementById("username").value;
+    const password = document.getElementById("password").value;
+    try {
+      const r = await fetch("/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+      if (!r.ok) {
+        const j = await r.json().catch(() => ({}));
+        throw new Error(j.detail || "Giris basarisiz");
+      }
+      const data = await r.json();
+      localStorage.setItem("token", data.access_token);
+      localStorage.setItem("user", JSON.stringify({
+        username, department: data.department, role: data.role, label: data.label,
+      }));
+      location.href = "/ui/dashboard";
+    } catch (ex) {
+      err.textContent = ex.message;
+      err.classList.remove("hidden");
+    }
+  });
+</script>
+{% endblock %}

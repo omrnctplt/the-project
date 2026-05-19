@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Yonetim{% endblock %}
+{% block content %}
+<section class="card">
+  <h1>Calisma Zamani Konfigurasyonu</h1>
+  <form id="configForm" class="grid two">
+    <label>Beklenen kullanici sayisi
+      <input type="number" min="1" max="500" id="expectedUsers" />
+    </label>
+    <label>Es zamanli istek (kullanici basina)
+      <input type="number" min="1" max="20" id="expectedConcurrency" />
+    </label>
+    <label>Idle unload (dakika)
+      <input type="number" min="1" max="240" id="idleUnloadMinutes" />
+    </label>
+    <label class="checkbox">
+      <input type="checkbox" id="autoPull" />
+      Eksik modelleri otomatik indir
+    </label>
+    <label class="checkbox">
+      <input type="checkbox" id="manualOverride" />
+      Aktif model listesini manuel olarak belirle
+    </label>
+    <label class="full">Aktif model id'leri (virgulle)
+      <input type="text" id="activeModels" placeholder="orn: llama3.2-1b, qwen2.5-coder-1.5b" />
+    </label>
+    <div class="full">
+      <button type="submit" class="primary">Kaydet ve yeniden planla</button>
+    </div>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Kullanicilar</h2>
+  <table id="usersTable" class="data">
+    <thead><tr><th>Kullanici</th><th>Departman</th><th>Rol</th><th>Etiket</th><th>Son Giris</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</section>
+
+<section class="card">
+  <h2>Kullanim (Genel)</h2>
+  <div class="grid two">
+    <div>
+      <h3>Kullanici Bazinda</h3>
+      <table id="globalUsers" class="data">
+        <thead><tr><th>Kullanici</th><th>Istek</th><th>Token</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div>
+      <h3>Model Bazinda</h3>
+      <table id="globalModels" class="data">
+        <thead><tr><th>Model</th><th>Istek</th><th>Ort. ms</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Denetim Kaydi (Son 100)</h2>
+  <table id="auditTable" class="data">
+    <thead>
+      <tr>
+        <th>Zaman</th><th>Kullanici</th><th>Dept</th><th>Model</th>
+        <th>Kural</th><th>Fallback</th><th>Durum</th><th>ms</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</section>
+{% endblock %}
+{% block scripts %}
+<script src="/static/admin.js"></script>
+{% endblock %}

@@ -1,0 +1,47 @@
+# Demo kullanicilar. Uretim ortaminda bu dosyayi silin veya guclu sifreler atayin.
+# Sifreler ilk acilista bcrypt ile hashlenir ve data/users.db'ye yazilir;
+# bu dosya sadece "ilk kurulum tohumudur" — degisiklikler DB'den okunur.
+# "${ADMIN_PASSWORD}" tokeni .env'deki ADMIN_PASSWORD ile degistirilir.
+
+users:
+  admin:
+    password: "${ADMIN_PASSWORD}"
+    department: engineering
+    role: admin
+    label: "Sistem Yoneticisi"
+
+  hr_user:
+    password: "hr123"
+    department: hr
+    role: user
+    label: "IK Calisani"
+
+  dev_user:
+    password: "dev123"
+    department: engineering
+    role: user
+    label: "Yazilim Gelistirici"
+
+  legal_user:
+    password: "legal123"
+    department: legal
+    role: user
+    label: "Hukuk Calisani"
+
+  finance_user:
+    password: "fin123"
+    department: finance
+    role: user
+    label: "Finans Calisani"
+
+  marketing_user:
+    password: "mkt123"
+    department: marketing
+    role: user
+    label: "Pazarlama Calisani"
+
+  guest:
+    password: "guest"
+    department: general
+    role: user
+    label: "Misafir Kullanici"
