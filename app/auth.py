@@ -69,6 +69,7 @@ def _verify_password(password: str, password_hash: str) -> bool:
 
 
 def seed_default_users() -> None:
+    admin_override = os.getenv("ADMIN_PASSWORD") or ""
     with _lock, _connect() as conn:
         _ensure_schema(conn)
         existing = {row["username"] for row in conn.execute("SELECT username FROM users")}
@@ -78,6 +79,8 @@ def seed_default_users() -> None:
             if username in existing:
                 continue
             password = str(props.get("password", "")) or "changeme"
+            if username == "admin" and admin_override:
+                password = admin_override
             department = str(props.get("department", "general"))
             role = str(props.get("role", "user"))
             label = props.get("label")

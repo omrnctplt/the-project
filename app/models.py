@@ -4,15 +4,19 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
-class LoginRequest(BaseModel):
+class _Base(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
+
+class LoginRequest(_Base):
     username: str = Field(..., min_length=1, max_length=64)
     password: str = Field(..., min_length=1, max_length=256)
 
 
-class TokenResponse(BaseModel):
+class TokenResponse(_Base):
     access_token: str
     token_type: str = "bearer"
     department: str
@@ -21,13 +25,13 @@ class TokenResponse(BaseModel):
     expires_in: int
 
 
-class ChatRequest(BaseModel):
+class ChatRequest(_Base):
     prompt: str = Field(..., min_length=1, max_length=8192)
     temperature: float | None = Field(default=None, ge=0.0, le=2.0)
     model_id: str | None = None     # admin override; siradan kullanici icin yok sayilir
 
 
-class ChatResponse(BaseModel):
+class ChatResponse(_Base):
     model_id: str
     category: str
     matched_rule: str
@@ -39,7 +43,8 @@ class ChatResponse(BaseModel):
     prompt_eval_count: int | None = None
 
 
-class ConfigUpdateRequest(BaseModel):
+class ConfigUpdateRequest(_Base):
+    profile: str | None = Field(default=None, pattern="^(auto|lite|balanced|performance)$")
     expected_users: int | None = Field(default=None, ge=1, le=1000)
     expected_concurrency: int | None = Field(default=None, ge=1, le=100)
     active_models: list[str] | None = None
@@ -48,13 +53,13 @@ class ConfigUpdateRequest(BaseModel):
     idle_unload_minutes: int | None = Field(default=None, ge=1, le=1440)
 
 
-class SystemProfileResponse(BaseModel):
+class SystemProfileResponse(_Base):
     hardware: dict[str, Any]
     capacity: dict[str, Any]
     runtime_config: dict[str, Any]
 
 
-class UsageSummary(BaseModel):
+class UsageSummary(_Base):
     username: str
     department: str
     total_requests: int

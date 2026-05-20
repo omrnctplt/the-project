@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -18,3 +19,4 @@ class AppState:
     orchestrator: Orchestrator | None = None
     router: Router | None = None
     ready: bool = False
+    tasks: list[asyncio.Task] = field(default_factory=list)

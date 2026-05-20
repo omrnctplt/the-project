@@ -1,6 +1,7 @@
 (async function () {
   try {
     const cfg = await api("/api/v1/system/config");
+    document.getElementById("profile").value = cfg.profile || "auto";
     document.getElementById("expectedUsers").value = cfg.expected_users;
     document.getElementById("expectedConcurrency").value = cfg.expected_concurrency;
     document.getElementById("idleUnloadMinutes").value = cfg.idle_unload_minutes;
@@ -12,6 +13,7 @@
   document.getElementById("configForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     const body = {
+      profile: document.getElementById("profile").value,
       expected_users: parseInt(document.getElementById("expectedUsers").value || "0", 10),
       expected_concurrency: parseInt(document.getElementById("expectedConcurrency").value || "0", 10),
       idle_unload_minutes: parseInt(document.getElementById("idleUnloadMinutes").value || "10", 10),

@@ -1,4 +1,16 @@
-"""Kapasite planlayicisi — donanim + katalog + config'den aktif model listesi uretir."""
+"""Kapasite planlayicisi.
+
+Profil bazli, donanima gore kendini ayarlayan plan. Amac: sistem bellegini
+asla doldurmadan, kategori cesitliligi koruyacak sekilde modelleri sirala.
+
+Profiller:
+  - lite        : Cok dusuk kaynak. Sadece fallback + en kucuk text modeli.
+  - balanced    : Tipik laptop / mini-PC. 2-3 model: text, code, fallback.
+  - performance : GPU veya yuksek RAM. Kategori basina 1-2 model.
+
+Donanim profili verildiginde uygun profili otomatik secer; kullanici
+runtime_config['profile'] ile override edebilir.
+"""
 
 from __future__ import annotations
 
@@ -8,19 +20,55 @@ from typing import Any
 
 log = logging.getLogger(__name__)
 
-CATEGORIES_PRIORITY = ("text", "code", "reasoning", "fallback")
-BUDGET_HEADROOM = 0.75   # toplam belleğin %75'ini model yukleme icin ayir
-FALLBACK_RESERVE = 1.0    # GB — fallback modeline ayrilan rezerv
+CATEGORY_PRIORITY = ("fallback", "text", "code", "reasoning")
+
+PROFILES: dict[str, dict[str, Any]] = {
+    "lite": {
+        "budget_ratio_cpu": 0.25,
+        "budget_ratio_gpu": 0.55,
+        "max_active": 1,
+        "max_loaded_models": 1,
+        "num_parallel": 1,
+        "allowed_categories": ["fallback"],
+        "label": "Lite (cok dusuk kaynak)",
+    },
+    "balanced": {
+        "budget_ratio_cpu": 0.40,
+        "budget_ratio_gpu": 0.70,
+        "max_active": 3,
+        "max_loaded_models": 1,
+        "num_parallel": 1,
+        "allowed_categories": ["fallback", "text", "code"],
+        "label": "Balanced (tipik laptop)",
+    },
+    "performance": {
+        "budget_ratio_cpu": 0.55,
+        "budget_ratio_gpu": 0.80,
+        "max_active": 6,
+        "max_loaded_models": 2,
+        "num_parallel": 2,
+        "allowed_categories": ["fallback", "text", "code", "reasoning"],
+        "label": "Performance (GPU / yuksek RAM)",
+    },
+}
+
+DEFAULT_PROFILE = "balanced"
+FALLBACK_RESERVE_GB = 0.8
 
 
 @dataclass
 class CapacityPlan:
-    accelerator: str           # "gpu" | "cpu"
+    accelerator: str
+    profile: str
+    profile_label: str
+    profile_auto: bool
     budget_total_gb: float
     budget_used_gb: float
     active_models: list[str] = field(default_factory=list)
     passive_models: list[str] = field(default_factory=list)
     max_concurrent_requests: int = 1
+    max_loaded_models: int = 1
+    num_parallel: int = 1
     expected_users: int = 0
     expected_concurrency: int = 0
     warnings: list[str] = field(default_factory=list)
@@ -29,12 +77,17 @@ class CapacityPlan:
     def to_dict(self) -> dict[str, Any]:
         return {
             "accelerator": self.accelerator,
+            "profile": self.profile,
+            "profile_label": self.profile_label,
+            "profile_auto": self.profile_auto,
             "budget_total_gb": round(self.budget_total_gb, 2),
             "budget_used_gb": round(self.budget_used_gb, 2),
-            "budget_free_gb": round(self.budget_total_gb - self.budget_used_gb, 2),
+            "budget_free_gb": round(max(0.0, self.budget_total_gb - self.budget_used_gb), 2),
             "active_models": self.active_models,
             "passive_models": self.passive_models,
             "max_concurrent_requests": self.max_concurrent_requests,
+            "max_loaded_models": self.max_loaded_models,
+            "num_parallel": self.num_parallel,
             "expected_users": self.expected_users,
             "expected_concurrency": self.expected_concurrency,
             "warnings": self.warnings,
@@ -48,108 +101,171 @@ def _model_size_gb(model: dict[str, Any], accelerator: str) -> float:
     return float(model.get("ram_gb") or model.get("vram_gb") or 0.0)
 
 
-def _budget_total_gb(hw: dict[str, Any]) -> tuple[str, float]:
+def _accelerator_and_total(hw: dict[str, Any]) -> tuple[str, float]:
     gpu = hw.get("gpu") or {}
-    if gpu.get("available") and gpu.get("vram_total_gb", 0) > 0:
-        return "gpu", float(gpu["vram_total_gb"]) * BUDGET_HEADROOM
+    if gpu.get("available") and float(gpu.get("vram_total_gb") or 0) >= 2.0:
+        return "gpu", float(gpu["vram_total_gb"])
     mem = hw.get("memory") or {}
     total = float(mem.get("effective_total_gb") or mem.get("host_total_gb") or 0.0)
-    return "cpu", max(total * BUDGET_HEADROOM, 1.0)
+    return "cpu", max(total, 1.0)
 
 
-def _max_parallel_per_model(num_parallel_env: int) -> int:
-    return max(1, num_parallel_env)
+def auto_select_profile(hw: dict[str, Any]) -> str:
+    accel, total = _accelerator_and_total(hw)
+    if accel == "gpu":
+        if total >= 12.0:
+            return "performance"
+        if total >= 6.0:
+            return "balanced"
+        return "lite"
+    if total < 6.0:
+        return "lite"
+    if total < 16.0:
+        return "balanced"
+    return "balanced"
 
 
-def _choose_models_for_category(
+def _smallest_in_category(
     catalog_models: dict[str, dict[str, Any]],
     category: str,
     accelerator: str,
-    remaining_budget_gb: float,
-) -> list[tuple[str, float]]:
-    candidates = [
-        (mid, m) for mid, m in catalog_models.items()
-        if m.get("category") == category
-    ]
-    candidates.sort(key=lambda kv: _model_size_gb(kv[1], accelerator))
-    chosen: list[tuple[str, float]] = []
-    budget = remaining_budget_gb
-    for mid, model in candidates:
-        size = _model_size_gb(model, accelerator)
+    budget_gb: float,
+    already_chosen: set[str],
+) -> tuple[str, float] | None:
+    cand: list[tuple[str, dict[str, Any], float]] = []
+    for mid, m in catalog_models.items():
+        if mid in already_chosen:
+            continue
+        if m.get("category") != category:
+            continue
+        size = _model_size_gb(m, accelerator)
         if size <= 0:
             continue
-        if size <= budget:
-            chosen.append((mid, size))
-            budget -= size
-        else:
+        cand.append((mid, m, size))
+    cand.sort(key=lambda t: t[2])
+    for mid, _, size in cand:
+        if size <= budget_gb:
+            return mid, size
+    return None
+
+
+def _pick_active_models(
+    catalog_models: dict[str, dict[str, Any]],
+    accelerator: str,
+    budget_total_gb: float,
+    profile_cfg: dict[str, Any],
+) -> tuple[list[tuple[str, float]], float]:
+    allowed = list(profile_cfg["allowed_categories"])
+    max_active = int(profile_cfg["max_active"])
+
+    chosen: list[tuple[str, float]] = []
+    chosen_ids: set[str] = set()
+    used = 0.0
+    remaining = budget_total_gb
+
+    fb = _smallest_in_category(catalog_models, "fallback", accelerator, remaining, chosen_ids)
+    if fb:
+        chosen.append(fb)
+        chosen_ids.add(fb[0])
+        used += fb[1]
+        remaining -= fb[1]
+
+    for category in [c for c in CATEGORY_PRIORITY if c != "fallback" and c in allowed]:
+        if len(chosen) >= max_active:
             break
-    if not chosen and candidates:
-        smallest_id, smallest = candidates[0]
-        size = _model_size_gb(smallest, accelerator)
-        if size <= remaining_budget_gb:
-            chosen.append((smallest_id, size))
-    return chosen
+        reserve = FALLBACK_RESERVE_GB if any(catalog_models[m].get("category") == "fallback" for m, _ in chosen) else 0.0
+        cat_budget = max(0.0, remaining - reserve)
+        pick = _smallest_in_category(catalog_models, category, accelerator, cat_budget, chosen_ids)
+        if not pick:
+            continue
+        chosen.append(pick)
+        chosen_ids.add(pick[0])
+        used += pick[1]
+        remaining -= pick[1]
+
+    for category in [c for c in CATEGORY_PRIORITY if c in allowed]:
+        if len(chosen) >= max_active:
+            break
+        pick = _smallest_in_category(catalog_models, category, accelerator, remaining, chosen_ids)
+        if not pick:
+            continue
+        chosen.append(pick)
+        chosen_ids.add(pick[0])
+        used += pick[1]
+        remaining -= pick[1]
+
+    return chosen, used
 
 
 def plan(
     hw_profile: dict[str, Any],
     catalog: dict[str, Any],
     runtime_config: dict[str, Any],
-    ollama_num_parallel: int = 2,
-    ollama_max_loaded_models: int = 3,
+    ollama_num_parallel: int | None = None,
+    ollama_max_loaded_models: int | None = None,
 ) -> CapacityPlan:
-    accelerator, budget_total = _budget_total_gb(hw_profile)
+    accelerator, total_gb = _accelerator_and_total(hw_profile)
     models_catalog: dict[str, dict[str, Any]] = catalog.get("models", {}) or {}
+
+    requested_profile = runtime_config.get("profile")
+    profile_auto = not requested_profile or requested_profile == "auto"
+    profile_name = requested_profile if (requested_profile in PROFILES) else auto_select_profile(hw_profile)
+    profile_cfg = PROFILES[profile_name]
+
+    ratio = profile_cfg["budget_ratio_gpu"] if accelerator == "gpu" else profile_cfg["budget_ratio_cpu"]
+    budget_total = max(0.5, total_gb * ratio)
+
+    num_parallel = int(ollama_num_parallel) if ollama_num_parallel else int(profile_cfg["num_parallel"])
+    max_loaded = int(ollama_max_loaded_models) if ollama_max_loaded_models else int(profile_cfg["max_loaded_models"])
 
     plan_obj = CapacityPlan(
         accelerator=accelerator,
+        profile=profile_name,
+        profile_label=str(profile_cfg["label"]),
+        profile_auto=profile_auto,
         budget_total_gb=budget_total,
         budget_used_gb=0.0,
+        max_loaded_models=max_loaded,
+        num_parallel=num_parallel,
         expected_users=int(runtime_config.get("expected_users", 0) or 0),
         expected_concurrency=int(runtime_config.get("expected_concurrency", 0) or 0),
     )
 
-    manual = runtime_config.get("manual_override") and runtime_config.get("active_models")
+    manual = bool(runtime_config.get("manual_override")) and bool(runtime_config.get("active_models"))
     if manual:
         plan_obj.notes.append("Aktif model listesi manuel olarak ayarlandi.")
-        active_ids = [m for m in runtime_config["active_models"] if m in models_catalog]
-        unknown = [m for m in runtime_config["active_models"] if m not in models_catalog]
-        if unknown:
-            plan_obj.warnings.append(f"Katalogda olmayan modeller atlandi: {unknown}")
         used = 0.0
-        for mid in active_ids:
+        for mid in runtime_config["active_models"]:
+            if mid not in models_catalog:
+                plan_obj.warnings.append(f"Katalogda olmayan model atlandi: {mid}")
+                continue
             size = _model_size_gb(models_catalog[mid], accelerator)
+            if size <= 0:
+                plan_obj.warnings.append(f"Model boyut bilgisi yok: {mid}")
+                plan_obj.passive_models.append(mid)
+                continue
             if used + size > budget_total:
                 plan_obj.passive_models.append(mid)
                 plan_obj.warnings.append(
-                    f"'{mid}' donanim butcesine sigmiyor (gerekli {size:.1f} GB, kalan "
-                    f"{max(0.0, budget_total - used):.1f} GB). Pasif olarak isaretlendi."
+                    f"'{mid}' butceye sigmiyor (gerekli {size:.1f} GB, kalan "
+                    f"{max(0.0, budget_total - used):.1f} GB). Pasif isaretlendi."
                 )
                 continue
             plan_obj.active_models.append(mid)
             used += size
         plan_obj.budget_used_gb = used
     else:
-        remaining = budget_total
-        used = 0.0
-        for category in CATEGORIES_PRIORITY:
-            cat_budget = remaining
-            if category != "fallback":
-                cat_budget = max(0.0, remaining - FALLBACK_RESERVE)
-            picks = _choose_models_for_category(models_catalog, category, accelerator, cat_budget)
-            for mid, size in picks:
-                if mid in plan_obj.active_models:
-                    continue
-                plan_obj.active_models.append(mid)
-                used += size
-                remaining -= size
+        picks, used = _pick_active_models(models_catalog, accelerator, budget_total, profile_cfg)
+        plan_obj.active_models = [mid for mid, _ in picks]
         plan_obj.budget_used_gb = used
-        for mid in models_catalog:
-            if mid not in plan_obj.active_models:
-                plan_obj.passive_models.append(mid)
 
-    loaded_cap = min(ollama_max_loaded_models, max(1, len(plan_obj.active_models)))
-    plan_obj.max_concurrent_requests = loaded_cap * _max_parallel_per_model(ollama_num_parallel)
+    actives = set(plan_obj.active_models) | set(plan_obj.passive_models)
+    for mid in models_catalog:
+        if mid not in actives:
+            plan_obj.passive_models.append(mid)
+
+    loaded_cap = min(max_loaded, max(1, len(plan_obj.active_models)))
+    plan_obj.max_concurrent_requests = loaded_cap * max(1, num_parallel)
 
     desired = plan_obj.expected_users * max(1, plan_obj.expected_concurrency)
     if desired and desired > plan_obj.max_concurrent_requests:
@@ -160,9 +276,17 @@ def plan(
         )
 
     if accelerator == "cpu":
-        plan_obj.notes.append("GPU bulunamadi; modeller CPU uzerinde calisacak. Yanit suresi daha yuksek olabilir.")
+        plan_obj.notes.append(
+            "GPU bulunamadi; modeller CPU uzerinde calisacak. Yanit suresi daha yuksek olabilir."
+        )
+    plan_obj.notes.append(
+        f"Profil: {profile_name} ({'otomatik' if profile_auto else 'manuel'}). "
+        f"Butce: {budget_total:.1f} GB / {total_gb:.1f} GB."
+    )
 
     if not plan_obj.active_models:
-        plan_obj.warnings.append("Hicbir model aktif olarak yuklenemedi. Donanim bellegi yetersiz olabilir.")
+        plan_obj.warnings.append(
+            "Hicbir model aktif olarak yuklenemedi. 'lite' profili veya daha kucuk modeller deneyin."
+        )
 
     return plan_obj

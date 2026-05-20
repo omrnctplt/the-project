@@ -16,18 +16,16 @@ CATALOG_PATH = CONFIG_DIR / "model_catalog.yaml"
 DEFAULT_USERS_PATH = CONFIG_DIR / "default_users.yaml"
 RUNTIME_CONFIG_PATH = DATA_DIR / "runtime_config.yaml"
 
+VALID_PROFILES = ("auto", "lite", "balanced", "performance")
+
 _lock = RLock()
-
-
-def _expand_env(text: str) -> str:
-    return os.path.expandvars(text)
 
 
 def _read_yaml(path: Path) -> dict[str, Any]:
     if not path.exists():
         raise FileNotFoundError(f"Konfigurasyon dosyasi yok: {path}")
     raw = path.read_text(encoding="utf-8")
-    data = yaml.safe_load(_expand_env(raw))
+    data = yaml.safe_load(raw)
     if not isinstance(data, dict):
         raise ValueError(f"Konfigurasyon dosyasi YAML map degil: {path}")
     return data
@@ -43,10 +41,11 @@ def load_default_users() -> dict[str, Any]:
 
 def default_runtime_config() -> dict[str, Any]:
     return {
+        "profile": os.getenv("CAPACITY_PROFILE", "auto"),
         "expected_users": 10,
-        "expected_concurrency": 2,
-        "auto_pull": os.getenv("AUTO_PULL_MODELS", "true").lower() == "true",
-        "idle_unload_minutes": int(os.getenv("IDLE_UNLOAD_MINUTES", "10")),
+        "expected_concurrency": 1,
+        "auto_pull": os.getenv("AUTO_PULL_MODELS", "false").lower() == "true",
+        "idle_unload_minutes": int(os.getenv("IDLE_UNLOAD_MINUTES", "3")),
         "active_models": [],
         "manual_override": False,
         "first_run_complete": False,
@@ -65,7 +64,11 @@ def load_runtime_config() -> dict[str, Any]:
         except (OSError, yaml.YAMLError):
             data = {}
         merged = default_runtime_config()
-        merged.update({k: v for k, v in data.items() if k in merged})
+        for k, v in data.items():
+            if k in merged:
+                merged[k] = v
+        if merged.get("profile") not in VALID_PROFILES:
+            merged["profile"] = "auto"
         return merged
 
 
@@ -83,7 +86,10 @@ def save_runtime_config(cfg: dict[str, Any]) -> None:
 def update_runtime_config(**changes: Any) -> dict[str, Any]:
     cfg = load_runtime_config()
     for key, value in changes.items():
-        if key in cfg:
-            cfg[key] = value
+        if key not in cfg:
+            continue
+        if key == "profile" and value not in VALID_PROFILES:
+            continue
+        cfg[key] = value
     save_runtime_config(cfg)
     return cfg

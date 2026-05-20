@@ -26,10 +26,12 @@
     ]);
 
     kvRows(document.getElementById("capTable"), [
+      ["Profil", `${cap.profile_label || cap.profile || "?"} (${cap.profile_auto ? "otomatik" : "manuel"})`],
       ["Hizlandirici", cap.accelerator?.toUpperCase()],
       ["Toplam butce (GB)", fmtNumber(cap.budget_total_gb, 2)],
       ["Kullanilan butce (GB)", fmtNumber(cap.budget_used_gb, 2)],
       ["Aktif model sayisi", (cap.active_models || []).length],
+      ["Maks. yuklu model", cap.max_loaded_models],
       ["Maks. es zamanli istek", cap.max_concurrent_requests],
       ["Beklenen kullanici", cap.expected_users],
       ["Es zamanlilik", cap.expected_concurrency],

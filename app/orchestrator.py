@@ -1,4 +1,13 @@
-"""Model lifecycle yoneticisi — pull, warmup, kullanim takibi, idle unload."""
+"""Model lifecycle yoneticisi.
+
+Sorumluluklar:
+  - Aktif/pasif model listesini ModelState olarak tutmak
+  - Pull islemini SIRAYLA yapmak (paralel pull yok; disk/network sismaz)
+  - Bootstrap'ta sadece fallback modeli pull etmek; digerleri lazy
+  - call() sirasinda model yuklu degilse otomatik pull (auto_pull=True ise)
+  - Es zamanli inference sayisini kapasite plan'a gore sinirlamak
+  - Idle modelleri belirli sure sonra Ollama'dan unload etmek
+"""
 
 from __future__ import annotations
 
@@ -35,6 +44,7 @@ class ModelState:
             "category": self.category,
             "status": self.status,
             "pulled": self.pulled,
+            "pull_progress": round(self.last_pull_progress, 2),
             "inflight_requests": self.inflight_requests,
             "total_requests": self.total_requests,
             "avg_latency_ms": (
@@ -56,11 +66,13 @@ class Orchestrator:
     passive_model_ids: list[str] = field(default_factory=list)
     client: OllamaClient = field(default_factory=OllamaClient)
     auto_pull: bool = True
-    idle_unload_minutes: int = 10
+    idle_unload_minutes: int = 3
+    max_concurrent_requests: int = 1
 
     def __post_init__(self) -> None:
         self._states: dict[str, ModelState] = {}
-        self._lock = asyncio.Lock()
+        self._pull_lock = asyncio.Lock()
+        self._inflight_sem = asyncio.Semaphore(max(1, self.max_concurrent_requests))
         models_def: dict[str, Any] = self.catalog.get("models", {}) or {}
         for mid in self.active_model_ids:
             m = models_def.get(mid)
@@ -73,7 +85,7 @@ class Orchestrator:
             )
         for mid in self.passive_model_ids:
             m = models_def.get(mid)
-            if not m:
+            if not m or mid in self._states:
                 continue
             self._states[mid] = ModelState(
                 model_id=mid,
@@ -89,18 +101,22 @@ class Orchestrator:
         return self._states.get(model_id)
 
     def first_ready(self, category: str) -> str | None:
-        candidates = [s for s in self._states.values() if s.category == category and s.status in ("ready", "loaded")]
+        candidates = [
+            s for s in self._states.values()
+            if s.category == category and s.status in ("ready", "loaded")
+        ]
         if not candidates:
             return None
         candidates.sort(key=lambda s: (s.inflight_requests, s.last_used_at))
         return candidates[0].model_id
 
     def least_busy_active(self, category: str | None = None) -> str | None:
-        actives = [s for s in self._states.values() if s.status in ("ready", "loaded", "pulling")]
+        actives = [
+            s for s in self._states.values()
+            if s.status in ("ready", "loaded", "pulling")
+        ]
         if category:
-            cat = [s for s in actives if s.category == category]
-            if cat:
-                actives = cat
+            actives = [s for s in actives if s.category == category]
         if not actives:
             return None
         actives.sort(key=lambda s: (s.inflight_requests, -s.total_requests))
@@ -112,9 +128,14 @@ class Orchestrator:
         except Exception as exc:
             log.warning("Yerel model listesi alinamadi: %s", exc)
             return
-        tag_set = {m.get("name", "").split(":", 1)[0] + ":" + m.get("name", "").split(":", 1)[1]
-                   if ":" in m.get("name", "") else m.get("name", "")
-                   for m in local}
+        tag_set: set[str] = set()
+        for m in local:
+            name = str(m.get("name", ""))
+            if not name:
+                continue
+            tag_set.add(name)
+            if ":" not in name:
+                tag_set.add(f"{name}:latest")
         for state in self._states.values():
             if state.ollama_tag in tag_set:
                 state.pulled = True
@@ -127,10 +148,11 @@ class Orchestrator:
             raise KeyError(f"Bilinmeyen model: {model_id}")
         if state.pulled:
             return
-        async with self._lock:
+        async with self._pull_lock:
             if state.pulled:
                 return
             state.status = "pulling"
+            state.error = None
             try:
                 async for event in self.client.pull(state.ollama_tag):
                     total = event.get("total") or 0
@@ -147,18 +169,45 @@ class Orchestrator:
                 state.status = "error"
                 state.error = str(exc)
                 log.error("Pull hatasi [%s]: %s", state.ollama_tag, exc)
+                raise
 
-    async def pull_all_active(self) -> None:
-        for mid in list(self._states):
-            state = self._states[mid]
-            if state.status == "passive":
-                continue
-            if state.pulled:
-                continue
-            try:
-                await self.ensure_pulled(mid)
-            except Exception as exc:
-                log.error("Aktif model indirilemedi [%s]: %s", mid, exc)
+    async def pull_initial(self) -> None:
+        """Bootstrap'ta sadece en kucuk 1 modeli (genelde fallback) indir.
+
+        Diger modeller lazy: ilk istek geldiginde indirilir.
+        """
+        await self.refresh_pulled_flags()
+        seed_id = self._pick_seed_model_id()
+        if not seed_id:
+            log.info("Bootstrap'ta indirilecek seed model bulunamadi.")
+            return
+        state = self._states[seed_id]
+        if state.pulled:
+            log.info("Seed model zaten yerel: %s", state.ollama_tag)
+            return
+        log.info("Seed model indiriliyor (lazy mod): %s", state.ollama_tag)
+        try:
+            await self.ensure_pulled(seed_id)
+        except Exception as exc:
+            log.warning("Seed pull basarisiz, sistem yine de calisacak: %s", exc)
+
+    def _pick_seed_model_id(self) -> str | None:
+        """Aktif modellerden en kucugunu (oncelikle fallback kategorisi) sec."""
+        models_def: dict[str, Any] = self.catalog.get("models", {}) or {}
+        actives = [s for s in self._states.values() if s.status != "passive"]
+        if not actives:
+            return None
+
+        def size_of(s: ModelState) -> float:
+            m = models_def.get(s.model_id) or {}
+            return float(m.get("ram_gb") or m.get("vram_gb") or 999.0)
+
+        fb = [s for s in actives if s.category == "fallback"]
+        if fb:
+            fb.sort(key=size_of)
+            return fb[0].model_id
+        actives.sort(key=size_of)
+        return actives[0].model_id
 
     async def warmup_all(self) -> None:
         for state in self._states.values():
@@ -183,41 +232,46 @@ class Orchestrator:
             raise KeyError(f"Bilinmeyen model: {model_id}")
         if state.status == "passive":
             raise OllamaError(f"Model pasif: {model_id}")
-        if not state.pulled and self.auto_pull:
+        if not state.pulled:
+            if not self.auto_pull:
+                raise OllamaError(
+                    f"Model henuz indirilmemis ve auto_pull kapali: {model_id}"
+                )
             await self.ensure_pulled(model_id)
 
-        state.inflight_requests += 1
-        t0 = time.perf_counter()
-        try:
-            result = await self.client.generate(
-                state.ollama_tag,
-                prompt,
-                temperature=temperature,
-                context_window=context_window,
-                keep_alive=f"{self.idle_unload_minutes}m",
-            )
-            elapsed_ms = (time.perf_counter() - t0) * 1000
-            state.last_used_at = time.time()
-            state.status = "loaded"
-            state.total_requests += 1
-            state.total_latency_ms += elapsed_ms
-            eval_count = int(result.get("eval_count") or 0)
-            prompt_count = int(result.get("prompt_eval_count") or 0)
-            state.total_tokens += eval_count + prompt_count
-            result["_latency_ms"] = round(elapsed_ms, 1)
-            result["_model_id"] = model_id
-            return result
-        except OllamaError:
-            state.error = "generate hatasi"
-            raise
-        finally:
-            state.inflight_requests = max(0, state.inflight_requests - 1)
+        async with self._inflight_sem:
+            state.inflight_requests += 1
+            t0 = time.perf_counter()
+            try:
+                result = await self.client.generate(
+                    state.ollama_tag,
+                    prompt,
+                    temperature=temperature,
+                    context_window=context_window,
+                    keep_alive=f"{self.idle_unload_minutes}m",
+                )
+                elapsed_ms = (time.perf_counter() - t0) * 1000
+                state.last_used_at = time.time()
+                state.status = "loaded"
+                state.total_requests += 1
+                state.total_latency_ms += elapsed_ms
+                eval_count = int(result.get("eval_count") or 0)
+                prompt_count = int(result.get("prompt_eval_count") or 0)
+                state.total_tokens += eval_count + prompt_count
+                result["_latency_ms"] = round(elapsed_ms, 1)
+                result["_model_id"] = model_id
+                return result
+            except OllamaError:
+                state.error = "generate hatasi"
+                raise
+            finally:
+                state.inflight_requests = max(0, state.inflight_requests - 1)
 
     async def idle_sweep_loop(self, period_sec: float = 60.0) -> None:
         while True:
             try:
                 await asyncio.sleep(period_sec)
-                threshold = self.idle_unload_minutes * 60
+                threshold = max(30, self.idle_unload_minutes * 60)
                 now = time.time()
                 for state in self._states.values():
                     if state.status != "loaded":
@@ -227,7 +281,11 @@ class Orchestrator:
                     if now - state.last_used_at < threshold:
                         continue
                     log.info("Idle unload: %s (%.0fs bos)", state.model_id, now - state.last_used_at)
-                    await self.client.unload(state.ollama_tag)
+                    try:
+                        await self.client.unload(state.ollama_tag)
+                    except Exception as exc:
+                        log.warning("Unload hata [%s]: %s", state.model_id, exc)
+                        continue
                     state.status = "ready"
             except asyncio.CancelledError:
                 return

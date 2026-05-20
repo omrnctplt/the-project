@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
-from fastapi import Depends, FastAPI, HTTPException, Request, status
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -38,6 +38,17 @@ logging.basicConfig(
 log = logging.getLogger("gateway")
 
 
+def _env_int(name: str) -> int | None:
+    raw = os.getenv(name, "").strip()
+    if not raw:
+        return None
+    try:
+        return int(raw)
+    except ValueError:
+        log.warning("%s degeri sayi degil: %r", name, raw)
+        return None
+
+
 def _refresh_capacity_metrics(state: AppState) -> None:
     cap = state.capacity or {}
     metrics.ACTIVE_MODELS.set(len(cap.get("active_models") or []))
@@ -47,12 +58,49 @@ def _refresh_capacity_metrics(state: AppState) -> None:
     try:
         metrics.HARDWARE_INFO.labels(
             accelerator=cap.get("accelerator", "?"),
+            profile=cap.get("profile", "?"),
             gpu_count=str(len(gpu.get("devices") or [])),
             ram_gb=str(mem.get("effective_total_gb", "?")),
             vram_gb=str(gpu.get("vram_total_gb", "?")),
         ).set(1)
     except Exception:
         pass
+
+
+def _build_orchestrator(state: AppState) -> Orchestrator:
+    cap = state.capacity or {}
+    return Orchestrator(
+        catalog=state.catalog,
+        active_model_ids=list(cap.get("active_models") or []),
+        passive_model_ids=list(cap.get("passive_models") or []),
+        client=OllamaClient(),
+        auto_pull=bool(state.runtime_config.get("auto_pull", False)),
+        idle_unload_minutes=int(state.runtime_config.get("idle_unload_minutes", 3)),
+        max_concurrent_requests=int(cap.get("max_concurrent_requests", 1)),
+    )
+
+
+def _make_plan(state: AppState) -> dict[str, Any]:
+    plan = capacity_mod.plan(
+        hw_profile=state.hw_profile,
+        catalog=state.catalog,
+        runtime_config=state.runtime_config,
+        ollama_num_parallel=_env_int("OLLAMA_NUM_PARALLEL"),
+        ollama_max_loaded_models=_env_int("OLLAMA_MAX_LOADED_MODELS"),
+    )
+    state.capacity = plan.to_dict()
+    for warn in plan.warnings:
+        log.warning("Kapasite uyari: %s", warn)
+    log.info(
+        "Kapasite plani: profil=%s, %s, %d aktif model, ~%d es zamanli istek (butce %.1f/%.1f GB)",
+        plan.profile,
+        plan.accelerator,
+        len(plan.active_models),
+        plan.max_concurrent_requests,
+        plan.budget_used_gb,
+        plan.budget_total_gb,
+    )
+    return state.capacity
 
 
 async def _bootstrap(state: AppState) -> None:
@@ -67,63 +115,35 @@ async def _bootstrap(state: AppState) -> None:
     hwprobe.write_profile(profile)
     state.hw_profile = profile
     log.info(
-        "Donanim: %s CPU, %.1f GB RAM, GPU=%s",
+        "Donanim: %s CPU, %.1f GB effective RAM (kaynak: %s), GPU=%s",
         profile["cpu"]["logical_cores"],
         profile["memory"]["effective_total_gb"],
+        profile["memory"].get("effective_source", "?"),
         profile["gpu"]["vram_total_gb"] if profile["gpu"]["available"] else "yok",
     )
 
-    catalog = cfg.load_catalog()
-    state.catalog = catalog
+    state.catalog = cfg.load_catalog()
     state.runtime_config = cfg.load_runtime_config()
-
-    ollama_num_parallel = int(os.getenv("OLLAMA_NUM_PARALLEL", "2"))
-    ollama_max_loaded = int(os.getenv("OLLAMA_MAX_LOADED_MODELS", "3"))
-    plan = capacity_mod.plan(
-        hw_profile=profile,
-        catalog=catalog,
-        runtime_config=state.runtime_config,
-        ollama_num_parallel=ollama_num_parallel,
-        ollama_max_loaded_models=ollama_max_loaded,
-    )
-    state.capacity = plan.to_dict()
-    log.info(
-        "Kapasite plani: %s, %d aktif model, ~%d es zamanli istek",
-        plan.accelerator,
-        len(plan.active_models),
-        plan.max_concurrent_requests,
-    )
-    for warn in plan.warnings:
-        log.warning("Kapasite uyari: %s", warn)
+    _make_plan(state)
     _refresh_capacity_metrics(state)
 
-    orch = Orchestrator(
-        catalog=catalog,
-        active_model_ids=plan.active_models,
-        passive_model_ids=plan.passive_models,
-        client=OllamaClient(),
-        auto_pull=state.runtime_config.get("auto_pull", True),
-        idle_unload_minutes=int(state.runtime_config.get("idle_unload_minutes", 10)),
-    )
+    orch = _build_orchestrator(state)
     state.orchestrator = orch
-    state.router = Router(catalog, orch)
+    state.router = Router(state.catalog, orch)
 
     state.ready = True
-    log.info("Gateway hazir. /healthz 200, modeller arka planda iniyor olabilir.")
+    log.info("Gateway hazir. Seed model arka planda iniyor olabilir.")
 
-    async def _pull_loop() -> None:
+    async def _seed_loop() -> None:
         try:
-            await orch.refresh_pulled_flags()
-            if orch.auto_pull:
-                log.info("Aktif modeller indiriliyor (background)...")
-                await orch.pull_all_active()
-            if catalog.get("defaults", {}).get("warmup_on_start"):
+            await orch.pull_initial()
+            if state.catalog.get("defaults", {}).get("warmup_on_start"):
                 await orch.warmup_all()
         except Exception as exc:
-            log.exception("Pull/warmup hatasi: %s", exc)
+            log.exception("Seed pull/warmup hatasi: %s", exc)
 
-    asyncio.create_task(_pull_loop())
-    asyncio.create_task(orch.idle_sweep_loop())
+    state.tasks.append(asyncio.create_task(_seed_loop()))
+    state.tasks.append(asyncio.create_task(orch.idle_sweep_loop()))
 
 
 @asynccontextmanager
@@ -135,10 +155,22 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         log.exception("Bootstrap hata aldi: %s", exc)
         state.ready = False
-    yield
-    if state.orchestrator:
-        await state.orchestrator.client.aclose()
-    log.info("Gateway kapaniyor.")
+    try:
+        yield
+    finally:
+        for t in state.tasks:
+            t.cancel()
+        for t in state.tasks:
+            try:
+                await t
+            except (asyncio.CancelledError, Exception):
+                pass
+        if state.orchestrator:
+            try:
+                await state.orchestrator.client.aclose()
+            except Exception:
+                pass
+        log.info("Gateway kapaniyor.")
 
 
 APP_ROOT = Path(__file__).parent
@@ -146,8 +178,8 @@ templates = Jinja2Templates(directory=str(APP_ROOT / "ui" / "templates"))
 
 app = FastAPI(
     title="On-Premise AI Gateway",
-    version="0.1.0",
-    description="Departman bazli akilli yonlendirme + denetim katmani.",
+    version="0.2.0",
+    description="Profil bazli, donanima gore kendini ayarlayan AI gateway.",
     lifespan=lifespan,
 )
 
@@ -173,6 +205,7 @@ async def readyz(request: Request) -> JSONResponse:
         "ready": bool(state.ready and ollama_alive),
         "ollama": ollama_alive,
         "active_models": (state.capacity or {}).get("active_models", []),
+        "profile": (state.capacity or {}).get("profile"),
     }
     code = 200 if payload["ready"] else 503
     return JSONResponse(payload, status_code=code)
@@ -190,7 +223,11 @@ async def metrics_endpoint(request: Request) -> Any:
             pass
         for st in state.orchestrator.states():
             if st.get("status") == "pulling":
-                metrics.MODEL_PULL_PROGRESS.labels(model=st["model_id"]).set(0.5)
+                metrics.MODEL_PULL_PROGRESS.labels(model=st["model_id"]).set(
+                    float(st.get("pull_progress") or 0.0)
+                )
+            elif st.get("pulled"):
+                metrics.MODEL_PULL_PROGRESS.labels(model=st["model_id"]).set(1.0)
     return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
@@ -254,7 +291,13 @@ async def chat(
             fallback = False
             fallback_reason: str | None = None
         else:
-            decision = state.router.decide(department, body.prompt)
+            try:
+                decision = state.router.decide(department, body.prompt)
+            except RuntimeError as exc:
+                raise HTTPException(
+                    status_code=503,
+                    detail=f"Henuz hazir model yok: {exc}. Modeller indiriliyor olabilir veya Ollama erisilemez.",
+                ) from exc
             decision_model = decision.model_id
             category = decision.category
             matched_rule = decision.matched_rule
@@ -343,6 +386,20 @@ async def system_profile(request: Request, _=Depends(auth.current_principal)) ->
     )
 
 
+@app.get("/api/v1/system/profiles")
+async def system_profiles(_=Depends(auth.current_principal)) -> dict[str, Any]:
+    return {
+        name: {
+            "label": cfg_obj["label"],
+            "max_active": cfg_obj["max_active"],
+            "max_loaded_models": cfg_obj["max_loaded_models"],
+            "num_parallel": cfg_obj["num_parallel"],
+            "allowed_categories": cfg_obj["allowed_categories"],
+        }
+        for name, cfg_obj in capacity_mod.PROFILES.items()
+    }
+
+
 @app.get("/api/v1/system/config")
 async def get_runtime_config(_=Depends(auth.current_principal)) -> dict[str, Any]:
     return cfg.load_runtime_config()
@@ -355,9 +412,8 @@ async def update_runtime_config(
     _=Depends(auth.require_admin),
 ) -> dict[str, Any]:
     changes = {k: v for k, v in body.model_dump().items() if v is not None}
-    new_cfg = cfg.update_runtime_config(**changes)
-    await _replan(request)
-    return new_cfg
+    cfg.update_runtime_config(**changes)
+    return await _replan(request)
 
 
 @app.post("/api/v1/system/replan")
@@ -365,32 +421,37 @@ async def replan(request: Request, _=Depends(auth.require_admin)) -> dict[str, A
     return await _replan(request)
 
 
+@app.post("/api/v1/system/pull/{model_id}")
+async def pull_model(
+    model_id: str,
+    request: Request,
+    _=Depends(auth.require_admin),
+) -> dict[str, Any]:
+    state = _state(request)
+    if not state.orchestrator:
+        raise HTTPException(status_code=503, detail="Orchestrator hazir degil")
+    if not state.orchestrator.get_state(model_id):
+        raise HTTPException(status_code=404, detail=f"Model bulunamadi: {model_id}")
+    state.tasks.append(
+        asyncio.create_task(state.orchestrator.ensure_pulled(model_id))
+    )
+    return {"status": "pull_started", "model_id": model_id}
+
+
 async def _replan(request: Request) -> dict[str, Any]:
     state = _state(request)
     state.runtime_config = cfg.load_runtime_config()
-    plan = capacity_mod.plan(
-        hw_profile=state.hw_profile,
-        catalog=state.catalog,
-        runtime_config=state.runtime_config,
-        ollama_num_parallel=int(os.getenv("OLLAMA_NUM_PARALLEL", "2")),
-        ollama_max_loaded_models=int(os.getenv("OLLAMA_MAX_LOADED_MODELS", "3")),
-    )
-    state.capacity = plan.to_dict()
+    _make_plan(state)
     if state.orchestrator:
-        await state.orchestrator.client.aclose()
-    state.orchestrator = Orchestrator(
-        catalog=state.catalog,
-        active_model_ids=plan.active_models,
-        passive_model_ids=plan.passive_models,
-        client=OllamaClient(),
-        auto_pull=state.runtime_config.get("auto_pull", True),
-        idle_unload_minutes=int(state.runtime_config.get("idle_unload_minutes", 10)),
-    )
+        try:
+            await state.orchestrator.client.aclose()
+        except Exception:
+            pass
+    state.orchestrator = _build_orchestrator(state)
     state.router = Router(state.catalog, state.orchestrator)
     _refresh_capacity_metrics(state)
-    if state.orchestrator.auto_pull:
-        asyncio.create_task(state.orchestrator.pull_all_active())
-    asyncio.create_task(state.orchestrator.idle_sweep_loop())
+    state.tasks.append(asyncio.create_task(state.orchestrator.pull_initial()))
+    state.tasks.append(asyncio.create_task(state.orchestrator.idle_sweep_loop()))
     return state.capacity
 
 

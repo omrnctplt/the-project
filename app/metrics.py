@@ -59,5 +59,5 @@ MODEL_PULL_PROGRESS = Gauge(
 HARDWARE_INFO = Gauge(
     "ai_gateway_hardware_info",
     "Donanim profili (sabit deger 1, etiketlerde detay)",
-    ["accelerator", "gpu_count", "ram_gb", "vram_gb"],
+    ["accelerator", "profile", "gpu_count", "ram_gb", "vram_gb"],
 )

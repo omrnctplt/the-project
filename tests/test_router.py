@@ -39,6 +39,7 @@ def _orch(states: dict[str, str]) -> Orchestrator:
     orch.passive_model_ids = []
     orch.auto_pull = False
     orch.idle_unload_minutes = 10
+    orch.max_concurrent_requests = 1
     orch.client = None  # type: ignore
     orch._states = {}
     for mid, status in states.items():
@@ -52,9 +53,17 @@ def _orch(states: dict[str, str]) -> Orchestrator:
 def test_code_block_routes_to_code():
     orch = _orch({"txt-1": "ready", "code-1": "ready", "fb": "ready"})
     r = Router(CATALOG, orch)
-    decision = r.decide("hr", "```python\nprint(1)\n```")
+    decision = r.decide("engineering", "```python\nprint(1)\n```")
     assert decision.category == "code"
     assert decision.model_id == "code-1"
+
+
+def test_hr_code_block_falls_back_to_primary_text():
+    orch = _orch({"txt-1": "ready", "code-1": "ready", "fb": "ready"})
+    r = Router(CATALOG, orch)
+    decision = r.decide("hr", "```python\nprint(1)\n```")
+    assert decision.category == "text"
+    assert decision.model_id == "txt-1"
 
 
 def test_math_keyword_routes_to_reasoning():

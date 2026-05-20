@@ -4,6 +4,14 @@
 <section class="card">
   <h1>Calisma Zamani Konfigurasyonu</h1>
   <form id="configForm" class="grid two">
+    <label>Kapasite profili
+      <select id="profile">
+        <option value="auto">auto (donanima gore)</option>
+        <option value="lite">lite (cok dusuk kaynak)</option>
+        <option value="balanced">balanced (tipik laptop)</option>
+        <option value="performance">performance (GPU / yuksek RAM)</option>
+      </select>
+    </label>
     <label>Beklenen kullanici sayisi
       <input type="number" min="1" max="500" id="expectedUsers" />
     </label>

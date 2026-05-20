@@ -1,6 +1,6 @@
 # On-Premise AI Gateway
 
-Kucuk ekipler icin departman bazli, hafif ve acik kaynak bir yerel LLM yonlendirme katmani. Tek `docker compose up` ile gateway, Ollama, Prometheus ve Grafana ayaga kalkar. Sistem ilk acilista donanimi olcer, kapasiteyi planlar, departman+keyword tabanli akilli yonlendirme yapar ve butun istekleri denetler.
+Kucuk ekipler icin departman bazli, hafif ve acik kaynak bir yerel LLM yonlendirme katmani. Tek `docker compose up` ile gateway, Ollama, Prometheus ve Grafana ayaga kalkar. Sistem ilk acilista donanimi olcer, **uygun kapasite profilini secer**, departman + keyword tabanli akilli yonlendirme yapar ve butun istekleri denetler.
 
 > **Bitirme projesi notu:** Bu repository, departmana gore otomatik model secimi, denetlenebilir kullanim kaydi ve dinamik kapasite planlamasi yapan bir kavram kanitidir. Buyuk kurumsal cozumlerle (Run:ai, KServe, Ray Serve) yarisma iddiasinda degildir; 5-50 kisilik ekiplere "her seyin tek bir Docker projesine sigmasi" gozeten bir alternatif sunar.
 
@@ -19,7 +19,8 @@ Kucuk ekipler icin departman bazli, hafif ve acik kaynak bir yerel LLM yonlendir
 |  - Login & rol/departman cikarimi      |
 |  - Rate limit (departman basina)       |
 |  - Router (departman + keyword kural.) |
-|  - Orchestrator (model lifecycle)      |
+|  - Orchestrator (lazy pull, throttle)  |
+|  - Capacity planner (profil bazli)     |
 |  - Audit & Usage (SQLite)              |
 |  - Prometheus /metrics                 |
 +--------+---------------+----------+----+
@@ -40,7 +41,7 @@ Kucuk ekipler icin departman bazli, hafif ve acik kaynak bir yerel LLM yonlendir
 
 ### Gereksinimler
 - Docker Engine veya Docker Desktop (Windows / Linux / macOS)
-- En az 8 GB RAM, 20 GB disk
+- En az 6 GB RAM, 20 GB disk (lite profil 4 GB ile de calisir)
 - GPU opsiyonel — yoksa modeller CPU'da calisir
 
 ### 1. Ortam degiskenlerini hazirla
@@ -55,6 +56,11 @@ cp .env.example .env
 ${EDITOR:-nano} .env
 ```
 
+`.env` icindeki onemli alanlar:
+- `CAPACITY_PROFILE`: `auto` (onerilen) / `lite` / `balanced` / `performance`
+- `HOST_RAM_GB`: Host'unuzun toplam RAM'i (GB). Bilgisayar Docker Desktop / WSL2 ise dogru ayarlamak kritik.
+- `OLLAMA_MEM_LIMIT`: Ollama container'inin maks bellegi (varsayilan 6g). Host RAM'inizin yarisini gecirmeyin.
+
 ### 2. Servisleri baslat
 CPU-only (Windows dahil her ortam):
 ```bash
@@ -65,8 +71,9 @@ GPU'lu (NVIDIA Container Toolkit kurulu olmali):
 docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
 ```
 
-### 3. Modeller arka planda iniyor olabilir
-Ilk acilista `AUTO_PULL_MODELS=true` ise gateway aktif modelleri Ollama'ya indirir. Hangi modellerin aktif oldugunu gormek icin:
+### 3. Ilk pull ve gozlem
+Yeni varsayilan: **lazy pull**. Sistem aciliyken sadece bir adet kucuk "seed" model indirilir. Diger modeller, ilk gelen istekte (veya panelden manuel `pull` ile) indirilir. Bu sayede ilk acilista bilgisayariniz `1-25 GB model indirme + RAM doldurma` saldirisina ugramaz.
+
 ```bash
 docker compose logs -f gateway
 ```
@@ -82,7 +89,25 @@ veya tarayicidan `http://localhost:8080/ui/dashboard` (admin/admin ile giris).
 ```bash
 docker compose --profile sim up simulator
 ```
-`.env` icindeki `SIM_USERS`, `SIM_DURATION_SEC`, `SIM_DEPT_MIX` degerleri ile dilediginiz kadar yuk uretirsiniz; simulator sonuc raporunu logda basar.
+
+---
+
+## Kapasite Profilleri
+
+Sistem `runtime_config['profile']` (varsayilan `auto`) degerine gore farkli stratejiler uygular. Profil donanima bakilarak seciliyor — manuel override icin `.env`'de `CAPACITY_PROFILE` veya panelden "Profil" alani.
+
+| Profil | RAM/VRAM Butce Orani | Max Aktif Model | Max Yuklu Model | Paralel | Kategoriler |
+|---|---|---|---|---|---|
+| `lite`        | %25 CPU / %55 GPU | 1 | 1 | 1 | fallback |
+| `balanced`    | %40 CPU / %70 GPU | 3 | 1 | 1 | fallback, text, code |
+| `performance` | %55 CPU / %80 GPU | 6 | 2 | 2 | fallback, text, code, reasoning |
+
+**Otomatik secim:**
+- < 6 GB RAM (veya VRAM <2 GB) → `lite`
+- 6-16 GB RAM → `balanced`
+- > 12 GB VRAM → `performance`
+
+Profil her kategoriden **en kucuk** modeli secer. Boyle olunca model katalogundaki agir 7B modeller pasif kalir, sistem swap'a inmez.
 
 ---
 
@@ -102,25 +127,9 @@ docker compose --profile sim up simulator
 
 ---
 
-## Modeller (Mayis 2026 kataloğu)
+## Modeller (Mayis 2026 katalogu)
 
-`config/model_catalog.yaml` icinde 11 hafif model tanimli:
-
-| Model | Boyut | Kategori | Notlar |
-|---|---|---|---|
-| llama3.2:1b | 1.2B | text | Hizli metin |
-| llama3.2:3b | 3.2B | text | Dengeli metin |
-| qwen2.5:1.5b | 1.5B | text | Cok dilli, Turkce iyi |
-| qwen2.5:3b | 3.0B | text | Genel amacli |
-| gemma2:2b | 2.6B | text | Google Gemma 2 |
-| qwen2.5-coder:1.5b | 1.5B | code | Hizli kod tamamlama |
-| qwen2.5-coder:3b | 3.1B | code | Orta seviye coding |
-| qwen2.5-coder:7b | 7.6B | code | Tam coding asistani |
-| deepseek-r1:1.5b | 1.5B | reasoning | Reasoning hafif |
-| deepseek-r1:7b | 7.0B | reasoning | Reasoning buyuk |
-| qwen2.5:0.5b | 0.5B | fallback | Cok hafif yedek |
-
-Aktif/pasif ayrimi, donanim profilinizden otomatik yapilir. Yonetim panelinden manuel olarak da listeyi sabitleyebilirsiniz.
+`config/model_catalog.yaml` icinde 11 hafif model tanimli (0.5B ile 7B arasi). Aktif/pasif ayrimi profil + donanim profilinizden otomatik yapilir. Yonetim panelinden manuel olarak da listeyi sabitleyebilirsiniz.
 
 ---
 
@@ -128,8 +137,8 @@ Aktif/pasif ayrimi, donanim profilinizden otomatik yapilir. Yonetim panelinden m
 
 `model_catalog.yaml` icindeki `routing_rules` bolumunden duzenlenebilir. Varsayilan kurallar:
 
-1. Prompt'ta kod blogu (\`\`\` veya `def `, `function `, `class `, `SELECT`, `=>`) varsa **code** kategorisi.
-2. Prompt'ta `hesapla`, `formul`, `matematik`, `denklem` gibi anahtar kelimeler varsa **reasoning**.
+1. Prompt'ta kod blogu (\`\`\` veya `def `, `function `, `class `, `SELECT`, `=>`) varsa **code**.
+2. Prompt'ta `hesapla`, `formul`, `matematik`, `denklem` varsa **reasoning**.
 3. Aksi halde kullanicinin departmaninin `primary_category` degeri.
 4. Hedef kategoride hazir model yoksa **fallback**.
 
@@ -144,7 +153,9 @@ Yonetici hesabi tek bir istek icin spesifik model secebilir (UI: Sohbet sayfasi)
 | POST | `/login` | Kullanici/sifre → JWT |
 | POST | `/api/v1/chat` | Yetkili istek → otomatik secilmis modele yonlendir |
 | GET  | `/api/v1/models` | Aktif/pasif modeller ve canli durumlari |
+| POST | `/api/v1/system/pull/{model_id}` | Manuel pull tetikle (admin) |
 | GET  | `/api/v1/system/profile` | Donanim + kapasite + runtime config |
+| GET  | `/api/v1/system/profiles` | Tum profil tanimlari |
 | GET  | `/api/v1/system/config` | Mevcut runtime config |
 | PUT  | `/api/v1/system/config` | Runtime config guncelle (admin) |
 | POST | `/api/v1/system/replan` | Manuel yeniden plan (admin) |
@@ -161,7 +172,7 @@ OpenAPI/Swagger dokumantasyonu `/docs` yolundan ulasilabilir.
 
 ## Izleme (Grafana)
 
-Hazir dashboard `monitoring/grafana/dashboards/overview.json` icindedir; provisioning sayesinde Grafana acildiginda otomatik yuklenir. Panelleri:
+Hazir dashboard `monitoring/grafana/dashboards/overview.json` icindedir. Panelleri:
 
 - Aktif istekler, aktif model sayisi, yuklu model sayisi
 - Fallback ve rate-limit oranlari
@@ -177,12 +188,14 @@ Hazir dashboard `monitoring/grafana/dashboards/overview.json` icindedir; provisi
 
 | Belirti | Cozum |
 |---|---|
+| Bilgisayar acilista kilitleniyor | `.env` icinde `CAPACITY_PROFILE=lite` ve `OLLAMA_MEM_LIMIT=3g` yapip yeniden baslatin. |
 | `ollama` saglikli olmuyor | Ilk acilis Docker imajini indirir, 1-2 dakika bekleyin. `docker compose logs ollama` |
 | Modeller cok yavas iniyor | Ilk pull ag bant genisligine bagli. Loglardan ilerlemeyi izleyin. |
 | Gateway 502 donuyor | Ollama hazir degil ya da model pull bitmemis olabilir. `/readyz` 503 donerse normaldir. |
 | GPU goremiyor | `docker compose -f docker-compose.yml -f docker-compose.gpu.yml up` kullanin; NVIDIA Container Toolkit kurulu olmali. |
 | `JWT_SECRET zorunlu` hatasi | `.env` dosyasini olusturup `JWT_SECRET` doldurun. |
-| Yetersiz RAM uyarisi | `config/model_catalog.yaml` icinden buyuk modelleri kaldirin veya `idle_unload_minutes`'i dusurun. |
+| Yetersiz RAM uyarisi | Profili `lite`'a alin veya `HOST_RAM_GB` degerini gercek RAM'iniz olarak set edin. |
+| Yanlis RAM tespiti (Docker Desktop) | `.env` icinde `HOST_RAM_GB=16` gibi acikca yazin. |
 
 ---
 

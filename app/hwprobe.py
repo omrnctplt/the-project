@@ -1,7 +1,11 @@
 """Donanim kesfi — CPU, RAM, GPU/VRAM, disk.
 
-Container icinden cagrilir. cgroup limit'leri varsa onlari oncelikli sayar;
-yoksa host kaynaklarini raporlar. Sonuc /data/hw_profile.json'a yazilir.
+Container icinden cagrilir. Oncelik sirasi:
+  1. HOST_RAM_GB env var (kullanici manuel belirtti)
+  2. cgroup v2/v1 memory limit (Docker resource limit)
+  3. /proc/meminfo MemTotal (WSL2 / Linux host)
+  4. psutil.virtual_memory().total
+Sonuc /data/hw_profile.json'a yazilir.
 """
 
 from __future__ import annotations
@@ -42,6 +46,42 @@ def _read_cgroup_mem_limit_gb() -> float | None:
     return None
 
 
+def _read_proc_meminfo() -> dict[str, float] | None:
+    try:
+        text = Path("/proc/meminfo").read_text()
+    except OSError:
+        return None
+    out: dict[str, float] = {}
+    for line in text.splitlines():
+        parts = line.split(":", 1)
+        if len(parts) != 2:
+            continue
+        key = parts[0].strip()
+        tokens = parts[1].strip().split()
+        if not tokens:
+            continue
+        try:
+            kb = int(tokens[0])
+        except ValueError:
+            continue
+        out[key] = kb / 1024 / 1024
+    return out or None
+
+
+def _read_host_ram_override_gb() -> float | None:
+    raw = os.getenv("HOST_RAM_GB", "").strip()
+    if not raw:
+        return None
+    try:
+        v = float(raw)
+    except ValueError:
+        log.warning("HOST_RAM_GB cozumlenemedi: %r", raw)
+        return None
+    if v <= 0:
+        return None
+    return round(v, 2)
+
+
 def _detect_gpus_pynvml() -> list[dict[str, Any]] | None:
     try:
         import pynvml  # type: ignore
@@ -76,7 +116,7 @@ def _detect_gpus_pynvml() -> list[dict[str, Any]] | None:
             pynvml.nvmlShutdown()
         except Exception:
             pass
-    return gpus
+    return gpus or None
 
 
 def _detect_gpus_smi() -> list[dict[str, Any]] | None:
@@ -119,7 +159,7 @@ def _detect_gpus_smi() -> list[dict[str, Any]] | None:
 def detect_gpus() -> dict[str, Any]:
     gpus = _detect_gpus_pynvml() or _detect_gpus_smi()
     if not gpus:
-        return {"available": False, "devices": [], "vram_total_gb": 0.0}
+        return {"available": False, "devices": [], "vram_total_gb": 0.0, "vram_free_gb": 0.0}
     return {
         "available": True,
         "devices": gpus,
@@ -145,14 +185,36 @@ def detect_cpu() -> dict[str, Any]:
 
 def detect_memory() -> dict[str, Any]:
     vm = psutil.virtual_memory()
+    psutil_total = round(vm.total / 1024**3, 2)
+    psutil_avail = round(vm.available / 1024**3, 2)
+
     cgroup_limit = _read_cgroup_mem_limit_gb()
-    host_total = round(vm.total / 1024**3, 2)
-    effective = cgroup_limit if cgroup_limit and cgroup_limit < host_total else host_total
+    meminfo = _read_proc_meminfo() or {}
+    override = _read_host_ram_override_gb()
+
+    candidates: list[tuple[str, float]] = []
+    if override:
+        candidates.append(("HOST_RAM_GB override", override))
+    if cgroup_limit:
+        candidates.append(("cgroup limit", cgroup_limit))
+    if meminfo.get("MemTotal"):
+        candidates.append(("/proc/meminfo MemTotal", round(meminfo["MemTotal"], 2)))
+    candidates.append(("psutil", psutil_total))
+
+    effective = min(v for _, v in candidates)
+    source = next(name for name, v in candidates if v == effective)
+
+    available = psutil_avail
+    if "MemAvailable" in meminfo:
+        available = min(available, round(meminfo["MemAvailable"], 2))
+
     return {
-        "host_total_gb": host_total,
+        "host_total_gb": psutil_total,
         "cgroup_limit_gb": cgroup_limit,
+        "override_gb": override,
         "effective_total_gb": effective,
-        "available_gb": round(vm.available / 1024**3, 2),
+        "effective_source": source,
+        "available_gb": available,
     }
 
 
@@ -168,13 +230,13 @@ def detect_disk(path: str = "/data") -> dict[str, Any]:
 
 
 def probe() -> dict[str, Any]:
+    plat = {"system": os.name, "release": "", "machine": ""}
+    if hasattr(os, "uname"):
+        u = os.uname()
+        plat = {"system": u.sysname, "release": u.release, "machine": u.machine}
     return {
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        "platform": {
-            "system": os.uname().sysname if hasattr(os, "uname") else os.name,
-            "release": os.uname().release if hasattr(os, "uname") else "",
-            "machine": os.uname().machine if hasattr(os, "uname") else "",
-        },
+        "platform": plat,
         "cpu": detect_cpu(),
         "memory": detect_memory(),
         "gpu": detect_gpus(),
