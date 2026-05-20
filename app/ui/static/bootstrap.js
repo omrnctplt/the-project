@@ -1,11 +1,23 @@
-/* Bootstrap progress overlay — sistem ready degilse gosterir.
-   Token gerektirmez, /api/v1/system/bootstrap'i polluyor.
+/* Bootstrap overlay — SADECE backend ready=false oldugunda gosterilir.
+   - Sayfa yuklendiginde tek bir HEAD-style fetch atilir
+   - ready=true ise overlay yaratilmaz, polling baslamaz
+   - ready=false ise overlay olusturulur, 1.5sn polling baslar
+   - ready'a gecince fade-out + polling stop
+   - localStorage 'hub_bootstrapped' bayragi: bir kez ready oldu mu, sonraki
+     sayfa gecislerinde fetch bile yapilmaz (oturum kapanana kadar)
 */
 (function () {
-  const root = document.body;
+  const STORAGE_KEY = "hub_bootstrapped";
   let overlayEl = null;
   let pollTimer = null;
-  let lastReady = false;
+
+  async function fetchStatus() {
+    try {
+      const r = await fetch("/api/v1/system/bootstrap", { cache: "no-store" });
+      if (!r.ok) return null;
+      return await r.json();
+    } catch { return null; }
+  }
 
   function ensureOverlay() {
     if (overlayEl) return overlayEl;
@@ -14,11 +26,10 @@
     overlayEl.innerHTML = `
       <div class="panel">
         <h2><span class="pulse"></span> Sistem hazirlaniyor</h2>
-        <div class="sub">Donanim taraniyor, kapasite plani uretiliyor ve modeller iniyor. Bu islem ilk acilista 30 sn - 5 dk surebilir.</div>
+        <div class="sub">Donanim taraniyor, kapasite plani uretiliyor.<br/>Ilk acilis 5-30 sn surebilir.</div>
         <ul class="boot-steps" id="bootSteps"></ul>
-      </div>
-    `;
-    root.appendChild(overlayEl);
+      </div>`;
+    document.body.appendChild(overlayEl);
     return overlayEl;
   }
 
@@ -36,70 +47,49 @@
     for (const step of data.steps || []) {
       const li = document.createElement("li");
       li.className = "boot-step " + step.status;
-      const detail = step.detail ? `<div class="detail">${escapeHtml(step.detail)}</div>` : "";
+      const detail = step.detail ? `<div class="detail">${escape(step.detail)}</div>` : "";
       const ms = step.elapsed_ms != null && step.status !== "pending"
-        ? `<div class="ms">${step.elapsed_ms} ms</div>`
-        : "";
+        ? `<div class="ms">${step.elapsed_ms} ms</div>` : "";
       li.innerHTML = `
         <span class="icon"></span>
         <div class="body">
-          <div class="label">${escapeHtml(step.label)}</div>
+          <div class="label">${escape(step.label)}</div>
           ${detail}
         </div>
-        ${ms}
-      `;
+        ${ms}`;
       list.appendChild(li);
     }
   }
 
-  async function tick() {
-    try {
-      const r = await fetch("/api/v1/system/bootstrap", { cache: "no-store" });
-      if (!r.ok) return;
-      const data = await r.json();
-      if (data.ready && !lastReady) {
-        lastReady = true;
-        const allDone = (data.steps || []).every(s =>
-          ["ok", "warn", "skipped", "error"].includes(s.status)
-        );
-        render(data);
-        if (allDone) {
-          setTimeout(removeOverlay, 600);
-          stop();
-        }
-      } else if (data.ready) {
-        const allDone = (data.steps || []).every(s =>
-          ["ok", "warn", "skipped", "error"].includes(s.status)
-        );
-        if (allDone) { removeOverlay(); stop(); return; }
-        render(data);
-      } else {
-        render(data);
-      }
-    } catch (e) {
-      // baglanti yok — overlay'i acik birak, retry
-      ensureOverlay();
-    }
-  }
-
-  function start() {
-    if (pollTimer) return;
-    tick();
-    pollTimer = setInterval(tick, 1500);
-  }
-
-  function stop() {
-    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
-  }
-
-  function escapeHtml(s) {
+  function escape(s) {
     return String(s).replace(/[&<>"']/g, (c) =>
       ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])
     );
   }
 
-  // Auto-start: her sayfada calissin (login dahil)
-  document.addEventListener("DOMContentLoaded", start);
+  async function start() {
+    // Bir kez ready olduysa bu oturumda hic fetch atma
+    if (sessionStorage.getItem(STORAGE_KEY) === "1") return;
+    const first = await fetchStatus();
+    if (!first) return;  // baglanti yok — sessizce gec
+    if (first.ready) {
+      sessionStorage.setItem(STORAGE_KEY, "1");
+      return;  // overlay yaratilmaz
+    }
+    // Hazir degil — overlay ac + polling
+    render(first);
+    pollTimer = setInterval(async () => {
+      const data = await fetchStatus();
+      if (!data) return;
+      render(data);
+      if (data.ready) {
+        sessionStorage.setItem(STORAGE_KEY, "1");
+        clearInterval(pollTimer);
+        pollTimer = null;
+        setTimeout(removeOverlay, 500);
+      }
+    }, 1500);
+  }
 
-  window.bootstrapUI = { start, stop };
+  document.addEventListener("DOMContentLoaded", start);
 })();

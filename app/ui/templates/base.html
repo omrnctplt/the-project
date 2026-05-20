@@ -3,39 +3,51 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="theme-color" content="#0b0d12" />
+  <meta name="theme-color" content="#0a0c11" />
   <title>{% block title %}Inference Hub{% endblock %} · Inference Hub</title>
   <link rel="stylesheet" href="/static/style.css" />
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%236e9bff'/%3E%3Crect x='8' y='8' width='16' height='16' rx='3' fill='%230b0d12'/%3E%3C/svg%3E" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%236e9bff'/%3E%3Crect x='8' y='8' width='16' height='16' rx='3' fill='%230a0c11'/%3E%3C/svg%3E" />
 </head>
-<body>
-  <header class="topbar">
-    <div class="brand">
-      <div class="logo" aria-hidden="true"></div>
-      <span class="name">Inference Hub <span class="dim">/ Yonetim</span></span>
+<body class="{% block body_class %}{% endblock %}">
+  {% block shell %}
+  <div class="app-shell">
+    <aside class="sidebar" id="mainSidebar">
+      <div class="brand">
+        <div class="logo" aria-hidden="true"></div>
+        <div class="name">Inference Hub<span class="dim">v0.3.0</span></div>
+      </div>
+
+      <div class="user-card" id="userCard"></div>
+
+      <div class="nav-section">
+        <div class="title">Calisma alani</div>
+        <a href="/ui/chat"      data-nav="chat"      class="nav-item"><span class="icon">💬</span> Sohbet</a>
+        <a href="/ui/dashboard" data-nav="dashboard" class="nav-item"><span class="icon">📊</span> Genel bakis</a>
+        <a href="/ui/models"    data-nav="models"    class="nav-item"><span class="icon">🧩</span> Modeller</a>
+      </div>
+
+      <div class="nav-section" data-admin-only>
+        <div class="title">Yonetim</div>
+        <a href="/ui/admin"     data-nav="admin"     class="nav-item"><span class="icon">⚙</span> Ayarlar</a>
+        <a href="/ui/resources" data-nav="resources" class="nav-item"><span class="icon">📈</span> Kaynaklar</a>
+      </div>
+
+      <div class="spacer"></div>
+
+      <div class="footer-mini">
+        <a href="/docs" target="_blank" rel="noopener">API · OpenAPI</a>
+        <a href="http://localhost:3000" target="_blank" rel="noopener">Grafana</a>
+        <a href="http://localhost:9090" target="_blank" rel="noopener">Prometheus</a>
+      </div>
+    </aside>
+
+    <div class="main-area">
+      <main>
+        {% block content %}{% endblock %}
+      </main>
     </div>
-    <nav id="mainNav" class="hidden">
-      <a href="/ui/dashboard" data-nav="dashboard">Genel Bakis</a>
-      <a href="/ui/chat" data-nav="chat">Sohbet</a>
-      <a href="/ui/admin" data-nav="admin" data-admin-only>Yonetim</a>
-      <span class="spacer"></span>
-      <span class="user" id="navUser"></span>
-      <button id="logoutBtn" class="link" type="button">Cikis</button>
-    </nav>
-  </header>
-
-  <main class="container">
-    {% block content %}{% endblock %}
-  </main>
-
-  <footer class="footer">
-    <span>v0.2.0 &middot;
-      <a href="/metrics" target="_blank" rel="noopener">metrics</a> &middot;
-      <a href="/docs" target="_blank" rel="noopener">API</a> &middot;
-      <a href="http://localhost:3000" target="_blank" rel="noopener">Grafana</a> &middot;
-      <a href="http://localhost:9090" target="_blank" rel="noopener">Prometheus</a>
-    </span>
-  </footer>
+  </div>
+  {% endblock %}
 
   <div id="toast-area"></div>
 

@@ -18,7 +18,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
-from . import audit, auth, capacity as capacity_mod, config as cfg, hwprobe, metrics, usage
+from . import audit, auth, capacity as capacity_mod, config as cfg, hwprobe, metrics, sysmonitor, usage
 from .models import (
     CatalogModelRequest,
     ChatRequest,
@@ -111,15 +111,14 @@ def _make_plan(state: AppState) -> dict[str, Any]:
 
 async def _bootstrap(state: AppState) -> None:
     bt = state.bootstrap
-    bt.add("schema",   "Veritabani semalari hazirlaniyor")
-    bt.add("users",    "Demo kullanicilar seed ediliyor")
-    bt.add("hw",       "Donanim taraniyor")
-    bt.add("catalog",  "Model katalogu yukleniyor")
-    bt.add("plan",     "Kapasite plani uretiliyor")
-    bt.add("orch",     "Orchestrator + router baslatiliyor")
-    bt.add("seed",     "Seed model indiriliyor (lazy)")
-    bt.add("warmup",   "Modeller isiniyor (opsiyonel)")
-    log.info("Bootstrap basliyor (7+ adim)...")
+    bt.add("schema",     "Veritabani semalari hazirlaniyor")
+    bt.add("users",      "Demo kullanicilar seed ediliyor")
+    bt.add("hw",         "Donanim taraniyor")
+    bt.add("catalog",    "Model katalogu yukleniyor")
+    bt.add("plan",       "Kapasite plani uretiliyor")
+    bt.add("orch",       "Orchestrator + router baslatiliyor")
+    bt.add("local_scan", "Ollama'daki yerel modeller taraniyor")
+    log.info("Bootstrap basliyor...")
 
     bt.start("schema")
     try:
@@ -186,36 +185,20 @@ async def _bootstrap(state: AppState) -> None:
     state.router = Router(state.catalog, orch)
     bt.finish("orch", "ok", f"max {orch.max_concurrent_requests} eszamanli istek")
 
+    bt.start("local_scan")
+    try:
+        await orch.refresh_pulled_flags()
+        pulled = [m for m in orch.states() if m["pulled"]]
+        bt.finish("local_scan", "ok",
+                  f"{len(pulled)} model Ollama'da yerel bulundu" if pulled
+                  else "yerel model yok (kullanici secimi bekleniyor)")
+    except Exception as exc:
+        bt.finish("local_scan", "warn", f"Ollama'ya ulasilamadi: {exc}")
+
     state.ready = True
     state.bootstrap.finished_at = time.time()
-    log.info("Gateway hazir (UI'dan kullanilabilir). Seed model arka planda iniyor olabilir.")
+    log.info("Gateway hazir. ONBOARDING bekleniyor — kullanici model secinceye kadar pull yapilmaz.")
 
-    async def _seed_loop() -> None:
-        bt.start("seed", "ollama'ya baglaniyor...")
-        try:
-            await orch.pull_initial()
-            seed_id = orch._pick_seed_model_id()
-            if seed_id:
-                st = orch.get_state(seed_id)
-                bt.finish("seed", "ok" if (st and st.pulled) else "warn",
-                          f"seed: {seed_id} ({'hazir' if st and st.pulled else 'pull devam ediyor'})")
-            else:
-                bt.finish("seed", "skipped", "aktif model yok")
-        except Exception as exc:
-            bt.finish("seed", "warn", f"seed indirilemedi: {exc}")
-            log.warning("Seed pull hatasi: %s", exc)
-
-        bt.start("warmup")
-        try:
-            if state.catalog.get("defaults", {}).get("warmup_on_start"):
-                await orch.warmup_all()
-                bt.finish("warmup", "ok")
-            else:
-                bt.finish("warmup", "skipped", "warmup_on_start kapali (lazy)")
-        except Exception as exc:
-            bt.finish("warmup", "warn", str(exc))
-
-    state.tasks.append(asyncio.create_task(_seed_loop()))
     state.tasks.append(asyncio.create_task(orch.idle_sweep_loop()))
 
 
@@ -680,6 +663,96 @@ async def delete_catalog_model(
     return await _replan(request)
 
 
+@app.get("/api/v1/system/resources")
+async def system_resources(_=Depends(auth.current_principal)) -> dict[str, Any]:
+    """Sistem kaynak ozeti — host CPU/mem/disk + top processes + actions."""
+    return sysmonitor.snapshot()
+
+
+@app.get("/api/v1/onboarding/state")
+async def onboarding_state(request: Request, _=Depends(auth.current_principal)) -> dict[str, Any]:
+    """Ilk acilis akisi icin: bir model pull edilmis mi, kullanici ne yapmali?"""
+    state = _state(request)
+    has_orch = state.orchestrator is not None
+    pulled = []
+    if has_orch:
+        for s in state.orchestrator.states():
+            if s["pulled"]:
+                pulled.append(s)
+    return {
+        "needs_onboarding": len(pulled) == 0,
+        "pulled_count": len(pulled),
+        "pulled_models": [p["model_id"] for p in pulled],
+        "current_profile": state.capacity.get("profile") if state.capacity else None,
+        "active_models": state.capacity.get("active_models", []) if state.capacity else [],
+    }
+
+
+# Discovery: Ollama Library'de populer modeller (Mayis 2026)
+# Yeni model cikinca buraya eklemek veya admin'in arama yapip eklemesi yeterli
+DISCOVERABLE_MODELS = [
+    # fallback - cok kucuk
+    {"tag": "smollm2:360m",   "category": "fallback",  "approx_gb": 0.4, "label": "SmolLM2 360M",       "blurb": "Edge cihazlar icin ultra hafif."},
+    {"tag": "qwen2.5:0.5b",   "category": "fallback",  "approx_gb": 0.5, "label": "Qwen2.5 0.5B",       "blurb": "Hizli yedek, multi-dilli."},
+    {"tag": "qwen3:0.6b",     "category": "fallback",  "approx_gb": 0.6, "label": "Qwen3 0.6B",         "blurb": "Yeni nesil ultra-kucuk."},
+    # text - kucuk/orta
+    {"tag": "llama3.2:1b",    "category": "text",      "approx_gb": 1.5, "label": "Llama 3.2 1B",       "blurb": "Hizli metin yaniti."},
+    {"tag": "qwen3:1.7b",     "category": "text",      "approx_gb": 1.5, "label": "Qwen3 1.7B",         "blurb": "Yeni nesil, Turkce iyi."},
+    {"tag": "gemma3:1b",      "category": "text",      "approx_gb": 1.0, "label": "Gemma 3 1B",         "blurb": "Google, multilingual."},
+    {"tag": "gemma4:e2b",     "category": "text",      "approx_gb": 1.8, "label": "Gemma 4 E2B",        "blurb": "Nisan 2026, multimodal, 256K context."},
+    {"tag": "gemma4:e4b",     "category": "text",      "approx_gb": 3.2, "label": "Gemma 4 E4B",        "blurb": "Gemma 4 buyuk varyant."},
+    {"tag": "llama3.2:3b",    "category": "text",      "approx_gb": 2.5, "label": "Llama 3.2 3B",       "blurb": "Dengeli metin/ozet."},
+    {"tag": "qwen3:4b",       "category": "text",      "approx_gb": 3.0, "label": "Qwen3 4B",           "blurb": "Yeni nesil orta boy."},
+    {"tag": "gemma3:4b",      "category": "text",      "approx_gb": 3.0, "label": "Gemma 3 4B",         "blurb": "Tool calling + vision."},
+    {"tag": "mistral:7b",     "category": "text",      "approx_gb": 4.8, "label": "Mistral 7B",         "blurb": "Klasik verimli."},
+    {"tag": "qwen3:8b",       "category": "text",      "approx_gb": 5.5, "label": "Qwen3 8B",           "blurb": "Buyuk multilingual."},
+    {"tag": "granite3.1-dense:8b", "category": "text", "approx_gb": 5.5, "label": "IBM Granite 3.1",    "blurb": "Enterprise + tool calling."},
+    {"tag": "mistral-small3.2",    "category": "text", "approx_gb": 16.0, "label": "Mistral Small 3.2", "blurb": "24B production-grade."},
+    {"tag": "llama3.3:70b-instruct-q4_K_M", "category": "text", "approx_gb": 42.0, "label": "Llama 3.3 70B", "blurb": "Frontier kalite (agir donanim)."},
+    # code
+    {"tag": "qwen2.5-coder:1.5b", "category": "code",  "approx_gb": 1.2, "label": "Qwen Coder 1.5B",    "blurb": "Hizli kod tamamlama."},
+    {"tag": "qwen2.5-coder:3b",   "category": "code",  "approx_gb": 2.5, "label": "Qwen Coder 3B",      "blurb": "Orta seviye coding."},
+    {"tag": "qwen2.5-coder:7b",   "category": "code",  "approx_gb": 5.0, "label": "Qwen Coder 7B",      "blurb": "Tam coding asistani."},
+    {"tag": "qwen2.5-coder:14b",  "category": "code",  "approx_gb": 9.0, "label": "Qwen Coder 14B",     "blurb": "Agir coding + refactor."},
+    {"tag": "deepseek-v3:411b-pruned-coder", "category": "code", "approx_gb": 240.0, "label": "DeepSeek V3 Pruned 411B", "blurb": "Datacenter-grade coder."},
+    # reasoning
+    {"tag": "deepseek-r1:1.5b",   "category": "reasoning", "approx_gb": 1.5, "label": "DeepSeek R1 1.5B", "blurb": "Reasoning distill, hafif."},
+    {"tag": "deepseek-r1:7b",     "category": "reasoning", "approx_gb": 5.0, "label": "DeepSeek R1 7B",   "blurb": "Multi-step reasoning."},
+    {"tag": "deepseek-r1:14b",    "category": "reasoning", "approx_gb": 9.0, "label": "DeepSeek R1 14B",  "blurb": "Daha derin reasoning."},
+    {"tag": "phi4-mini",          "category": "reasoning", "approx_gb": 2.8, "label": "Phi-4 mini",       "blurb": "Microsoft STEM/reasoning."},
+    {"tag": "phi4:14b",           "category": "reasoning", "approx_gb": 9.0, "label": "Phi-4 14B",        "blurb": "Dense reasoning + STEM."},
+]
+
+
+@app.get("/api/v1/system/discover")
+async def discover_models(
+    q: str | None = None,
+    category: str | None = None,
+    max_gb: float | None = None,
+    request: Request = None,  # type: ignore
+    _=Depends(auth.current_principal),
+) -> dict[str, Any]:
+    """Ollama Library'den onerilen modeller — arama + filtre destekli."""
+    state = _state(request)
+    catalog_models = (state.catalog or {}).get("models", {}) or {}
+    existing_tags = {m.get("ollama_tag") for m in catalog_models.values()}
+
+    items = []
+    ql = (q or "").lower().strip()
+    for m in DISCOVERABLE_MODELS:
+        if ql and ql not in m["tag"].lower() and ql not in m["label"].lower():
+            continue
+        if category and m["category"] != category:
+            continue
+        if max_gb is not None and m["approx_gb"] > max_gb:
+            continue
+        items.append({
+            **m,
+            "in_catalog": m["tag"] in existing_tags,
+        })
+    return {"models": items, "categories": ["text", "code", "reasoning", "fallback"]}
+
+
 @app.get("/api/v1/system/ollama/local")
 async def ollama_local(request: Request, _=Depends(auth.require_admin)) -> dict[str, Any]:
     state = _state(request)
@@ -870,6 +943,21 @@ async def ui_chat(request: Request) -> HTMLResponse:
 @app.get("/ui/admin", include_in_schema=False, response_class=HTMLResponse)
 async def ui_admin(request: Request) -> HTMLResponse:
     return templates.TemplateResponse("admin.html", {"request": request})
+
+
+@app.get("/ui/models", include_in_schema=False, response_class=HTMLResponse)
+async def ui_models(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse("models.html", {"request": request})
+
+
+@app.get("/ui/onboarding", include_in_schema=False, response_class=HTMLResponse)
+async def ui_onboarding(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse("onboarding.html", {"request": request})
+
+
+@app.get("/ui/resources", include_in_schema=False, response_class=HTMLResponse)
+async def ui_resources(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse("resources.html", {"request": request})
 
 
 if __name__ == "__main__":

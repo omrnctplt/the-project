@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Modeller{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Modeller</h1>
+    <div class="subtitle">Aktif, indirilmis ve onerilen modeller — arama + kategoriye gore.</div>
+  </div>
+  <div class="actions">
+    <button id="refreshBtn" class="ghost">Yenile</button>
+    {% raw %}<button id="addCustomBtn" class="primary">Yeni model ekle</button>{% endraw %}
+  </div>
+</div>
+
+<section class="card" style="margin-bottom:1rem;">
+  <div class="search-box">
+    <input type="search" id="searchInput" placeholder="Model adi veya tag ara... (orn: qwen, deepseek, gemma)" />
+  </div>
+  <div class="filter-row" id="catFilter">
+    <button data-cat="" class="active">Hepsi</button>
+    <button data-cat="text">Metin</button>
+    <button data-cat="code">Kod</button>
+    <button data-cat="reasoning">Reasoning</button>
+    <button data-cat="fallback">Fallback</button>
+  </div>
+  <div class="filter-row" id="statusFilter">
+    <button data-st="" class="active">Tum durumlar</button>
+    <button data-st="pulled">Indirilmis</button>
+    <button data-st="fits">Butceye sigan</button>
+    <button data-st="not-pulled">Indirilmemis</button>
+  </div>
+</section>
+
+<div id="accordion" class="accordion"></div>
+
+<!-- Modal template for custom add will be created on demand by JS -->
+{% endblock %}
+{% block scripts %}
+<script src="/static/models.js"></script>
+{% endblock %}

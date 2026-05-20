@@ -1,37 +1,37 @@
 {% extends "base.html" %}
 {% block title %}Sohbet{% endblock %}
-{% block content %}
-<div class="page-header">
-  <div>
-    <h1>Sohbet</h1>
-    <div class="subtitle">Sorgunuz departmaniza atanmis modele otomatik yonlendirilir.</div>
+{% block shell %}
+<div class="chat-shell">
+  <aside class="chat-sidebar">
+    <button class="new-chat-btn" id="newChatBtn">+ Yeni sohbet</button>
+    <div class="muted" style="font-size:0.7rem; text-transform:uppercase; letter-spacing:0.08em; padding:0.5rem 0.25rem 0.1rem;">Gecmis</div>
+    <ul class="conv-list" id="convList"></ul>
+    <div style="flex:1;"></div>
+    <a href="/ui/chat" class="nav-item" style="opacity:0.7; padding:0.5rem; font-size:0.8rem; text-align:center; color:var(--muted);">← Ana panele don</a>
+  </aside>
+  <div class="chat-main">
+    <div class="chat-header">
+      <div class="title" id="chatTitle">Yeni sohbet</div>
+      <div class="meta-controls">
+        <label class="checkbox" style="margin:0; font-size:0.8rem;">
+          <input type="checkbox" id="streamToggle" checked /> Streaming
+        </label>
+        <select id="adminModel" class="hidden"><option value="">(otomatik)</option></select>
+        <a href="/ui/dashboard" class="muted" style="font-size:0.8rem;">Panel</a>
+      </div>
+    </div>
+    <div class="chat-body" id="chatBody"></div>
+    <div class="chat-input-area">
+      <form id="chatForm" class="input-wrap">
+        <textarea id="prompt" rows="1" placeholder="Bir sey sorun... (Enter ile gonder, Shift+Enter yeni satir)"></textarea>
+        <div class="controls">
+          <span class="hint"><span class="kbd">Enter</span> gonder · <span class="kbd">Shift+Enter</span> yeni satir</span>
+          <button type="submit" class="primary" id="sendBtn">Gonder ↵</button>
+        </div>
+      </form>
+    </div>
   </div>
 </div>
-
-<section class="card">
-  <div id="adminPicker" class="hidden">
-    <label>Model (yonetici icin)
-      <select id="adminModel">
-        <option value="">(otomatik secim)</option>
-      </select>
-    </label>
-  </div>
-
-  <form id="chatForm">
-    <label>Prompt
-      <textarea id="prompt" rows="4" placeholder="Sorunuzu yazin... (Enter ile yeni satir, Ctrl/Cmd+Enter ile gonder)"></textarea>
-    </label>
-    <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap;">
-      <label class="checkbox">
-        <input type="checkbox" id="streamToggle" checked />
-        Streaming (token token gelsin)
-      </label>
-      <button type="submit" class="primary">Gonder</button>
-    </div>
-  </form>
-
-  <div id="chatLog" class="log"></div>
-</section>
 {% endblock %}
 {% block scripts %}
 <script src="/static/chat.js"></script>

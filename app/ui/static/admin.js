@@ -1,4 +1,13 @@
 (async function () {
+  // Tab system
+  document.querySelector(".tabs").addEventListener("click", (e) => {
+    if (!e.target.matches("button[data-tab]")) return;
+    const t = e.target.dataset.tab;
+    document.querySelectorAll(".tabs button").forEach(b => b.classList.toggle("active", b.dataset.tab === t));
+    document.querySelectorAll(".tab-panel").forEach(p => p.classList.toggle("active", p.dataset.panel === t));
+  });
+
+  // --- Settings ---
   try {
     const cfg = await api("/api/v1/system/config");
     document.getElementById("profile").value = cfg.profile || "auto";
@@ -23,13 +32,13 @@
     };
     try {
       await api("/api/v1/system/config", { method: "PUT", body: JSON.stringify(body) });
-      toast("Konfigurasyon kaydedildi, sistem yeniden planladi.", "ok");
-      setTimeout(() => location.reload(), 700);
+      toast("Profil kaydedildi ve plan yenilendi.", "ok");
     } catch (err) {
-      toast("Kaydetme basarisiz: " + err.message, "error");
+      toast("Kaydetme basarisiz: " + err.message, "error", 5000);
     }
   });
 
+  // --- Users ---
   try {
     const u = await api("/api/v1/users");
     const tb = document.querySelector("#usersTable tbody");
@@ -37,168 +46,37 @@
     for (const row of (u.users || [])) {
       const tr = document.createElement("tr");
       tr.innerHTML = `
-        <td>${row.username}</td>
-        <td>${row.department}</td>
-        <td>${row.role}</td>
-        <td>${row.label || "—"}</td>
-        <td>${row.last_login_at || "—"}</td>`;
+        <td>${escapeHtml(row.username)}</td>
+        <td>${escapeHtml(row.department)}</td>
+        <td><span class="badge plain">${escapeHtml(row.role)}</span></td>
+        <td>${escapeHtml(row.label || "—")}</td>
+        <td class="muted">${row.last_login_at ? row.last_login_at.replace("T", " ").slice(0, 19) : "—"}</td>`;
       tb.appendChild(tr);
     }
   } catch (e) { console.error(e); }
 
+  // --- Usage ---
   try {
     const g = await api("/api/v1/usage/global");
     const tbu = document.querySelector("#globalUsers tbody");
     tbu.innerHTML = "";
     for (const row of (g.users || [])) {
       const tr = document.createElement("tr");
-      tr.innerHTML = `<td>${row.username}</td><td>${row.requests}</td><td>${row.tokens}</td>`;
+      tr.innerHTML = `<td>${escapeHtml(row.username)}</td><td>${row.requests}</td><td>${row.tokens}</td>`;
       tbu.appendChild(tr);
     }
+    if (!(g.users || []).length) tbu.innerHTML = `<tr><td colspan="3" class="muted">Henuz veri yok</td></tr>`;
     const tbm = document.querySelector("#globalModels tbody");
     tbm.innerHTML = "";
     for (const row of (g.models || [])) {
       const tr = document.createElement("tr");
-      tr.innerHTML = `<td>${row.model_id}</td><td>${row.requests}</td><td>${row.avg_latency_ms ? row.avg_latency_ms.toFixed(0) : "—"}</td>`;
+      tr.innerHTML = `<td>${escapeHtml(row.model_id)}</td><td>${row.requests}</td><td>${row.avg_latency_ms ? Math.round(row.avg_latency_ms) : "—"}</td>`;
       tbm.appendChild(tr);
     }
+    if (!(g.models || []).length) tbm.innerHTML = `<tr><td colspan="3" class="muted">Henuz veri yok</td></tr>`;
   } catch (e) { console.error(e); }
 
-  // ---- Katalog yonetimi ----
-  async function refreshCatalog() {
-    try {
-      const c = await api("/api/v1/system/catalog");
-      const overridden = new Set(c.overridden || []);
-      const tb = document.querySelector("#catalogTable tbody");
-      tb.innerHTML = "";
-      for (const [mid, m] of Object.entries(c.models || {})) {
-        const isOverride = overridden.has(mid);
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
-          <td>${mid}</td>
-          <td><code>${m.ollama_tag}</code></td>
-          <td>${m.category}</td>
-          <td>${m.ram_gb || "?"} / ${m.vram_gb || "?"} GB</td>
-          <td>${isOverride ? '<span class="badge warn">override</span>' : '<span class="badge plain">yaml</span>'}</td>
-          <td>
-            <button data-pull="${mid}" class="small">pull</button>
-            ${isOverride ? `<button data-del="${mid}" class="small">sil</button>` : ""}
-          </td>`;
-        tb.appendChild(tr);
-      }
-      tb.querySelectorAll("button[data-pull]").forEach((b) => {
-        b.addEventListener("click", async () => {
-          try {
-            await api(`/api/v1/system/pull/${encodeURIComponent(b.dataset.pull)}`, { method: "POST" });
-            toast(`Pull baslatildi: ${b.dataset.pull}`, "ok");
-          } catch (e) { toast("Hata: " + e.message, "error"); }
-        });
-      });
-      tb.querySelectorAll("button[data-del]").forEach((b) => {
-        b.addEventListener("click", async () => {
-          if (!confirm(`'${b.dataset.del}' override'i silinsin mi?`)) return;
-          try {
-            await api(`/api/v1/system/catalog/models/${encodeURIComponent(b.dataset.del)}`, { method: "DELETE" });
-            refreshCatalog();
-            toast("Override silindi.", "ok");
-          } catch (e) { toast("Hata: " + e.message, "error"); }
-        });
-      });
-    } catch (e) { console.error(e); }
-  }
-  refreshCatalog();
-
-  document.getElementById("cm_dryrun").addEventListener("click", async () => {
-    const body = collectCatalogForm();
-    if (!body) return;
-    try {
-      const r = await api("/api/v1/system/catalog/dry-run", { method: "POST", body: JSON.stringify(body) });
-      const lines = [
-        `Model: ${r.model_id} (${r.size_gb.toFixed(1)} GB, ${r.accelerator.toUpperCase()})`,
-        `Mevcut profil: ${r.current_profile} — bos butce ${r.current_budget_free_gb.toFixed(1)}/${r.current_budget_total_gb.toFixed(1)} GB`,
-        `Sonuc: ${r.verdict}`,
-        ``,
-        r.advice,
-        ``,
-        `Profil bazli:`,
-        ...Object.entries(r.profiles).map(([n, p]) =>
-          `  ${n.padEnd(12)} butce ${p.budget_total_gb.toFixed(1)} GB | sigar: ${p.fits ? "evet" : "hayir"} | kategori OK: ${p.category_allowed ? "evet" : "hayir"}`
-        ),
-      ];
-      alert(lines.join("\n"));
-    } catch (err) { toast("Dry-run hata: " + err.message, "error", 5000); }
-  });
-
-  function collectCatalogForm() {
-    const body = {
-      model_id: document.getElementById("cm_model_id").value.trim(),
-      ollama_tag: document.getElementById("cm_ollama_tag").value.trim(),
-      category: document.getElementById("cm_category").value,
-      ram_gb: parseFloat(document.getElementById("cm_ram_gb").value),
-    };
-    if (!body.model_id || !body.ollama_tag || isNaN(body.ram_gb)) {
-      toast("Model ID, tag ve RAM zorunlu", "warn");
-      return null;
-    }
-    const pb = parseFloat(document.getElementById("cm_parameters_b").value);
-    const vr = parseFloat(document.getElementById("cm_vram_gb").value);
-    const prof = document.getElementById("cm_profile").value.trim();
-    if (!isNaN(pb)) body.parameters_b = pb;
-    if (!isNaN(vr)) body.vram_gb = vr;
-    if (prof) body.profile = prof;
-    return body;
-  }
-
-  document.getElementById("cm_inspect").addEventListener("click", async () => {
-    const tag = document.getElementById("cm_ollama_tag").value.trim();
-    if (!tag) { toast("Once Ollama tag girin.", "warn"); return; }
-    try {
-      const r = await api("/api/v1/system/ollama/inspect", { method: "POST", body: JSON.stringify({ ollama_tag: tag }) });
-      if (r.estimated_ram_gb) document.getElementById("cm_ram_gb").value = r.estimated_ram_gb;
-      if (r.parameter_size) {
-        const num = parseFloat(String(r.parameter_size).replace(/[^0-9.]/g, ""));
-        if (!isNaN(num)) document.getElementById("cm_parameters_b").value = num;
-      }
-      toast(`${r.parameter_size || "?"} parametre · ~${r.estimated_ram_gb || "?"} GB`, "ok");
-    } catch (e) { toast("Inspect basarisiz: " + e.message, "error", 5000); }
-  });
-
-  document.getElementById("catalogForm").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const body = {
-      model_id: document.getElementById("cm_model_id").value.trim(),
-      ollama_tag: document.getElementById("cm_ollama_tag").value.trim(),
-      category: document.getElementById("cm_category").value,
-      ram_gb: parseFloat(document.getElementById("cm_ram_gb").value),
-    };
-    const pb = parseFloat(document.getElementById("cm_parameters_b").value);
-    const vr = parseFloat(document.getElementById("cm_vram_gb").value);
-    const prof = document.getElementById("cm_profile").value.trim();
-    if (!isNaN(pb)) body.parameters_b = pb;
-    if (!isNaN(vr)) body.vram_gb = vr;
-    if (prof) body.profile = prof;
-    try {
-      await api("/api/v1/system/catalog/models", { method: "POST", body: JSON.stringify(body) });
-      refreshCatalog();
-      toast("Katalog'a eklendi, plan yenilendi.", "ok");
-      e.target.reset();
-    } catch (err) { toast("Eklenemedi: " + err.message, "error", 5000); }
-  });
-
-  // ---- Sifre degistir ----
-  document.getElementById("pwForm").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const body = {
-      current_password: document.getElementById("pw_current").value,
-      new_password: document.getElementById("pw_new").value,
-    };
-    try {
-      await api("/api/v1/me/password", { method: "POST", body: JSON.stringify(body) });
-      toast("Sifre guncellendi.", "ok");
-      document.getElementById("pwForm").reset();
-    } catch (err) { toast("Sifre degistirilemedi: " + err.message, "error", 5000); }
-  });
-
+  // --- Audit ---
   try {
     const a = await api("/api/v1/audit?limit=100");
     const tb = document.querySelector("#auditTable tbody");
@@ -206,15 +84,46 @@
     for (const row of (a.entries || [])) {
       const tr = document.createElement("tr");
       tr.innerHTML = `
-        <td>${row.timestamp?.replace("T", " ").slice(0, 19)}</td>
-        <td>${row.username}</td>
-        <td>${row.department}</td>
-        <td>${row.model_id || "—"}</td>
-        <td>${row.matched_rule || "—"}</td>
-        <td>${row.fallback ? "evet" : "—"}</td>
-        <td>${row.status}</td>
-        <td>${row.latency_ms ? row.latency_ms.toFixed(0) : "—"}</td>`;
+        <td class="muted">${row.timestamp?.replace("T", " ").slice(0, 19)}</td>
+        <td>${escapeHtml(row.username)}</td>
+        <td>${escapeHtml(row.department)}</td>
+        <td>${escapeHtml(row.model_id || "—")}</td>
+        <td class="muted">${escapeHtml(row.matched_rule || "—")}</td>
+        <td>${row.fallback ? '<span class="badge warn">evet</span>' : "—"}</td>
+        <td>${row.status === "ok" ? '<span class="badge ok">ok</span>' : '<span class="badge error">'+row.status+'</span>'}</td>
+        <td>${row.latency_ms ? Math.round(row.latency_ms) : "—"}</td>`;
       tb.appendChild(tr);
     }
+    if (!(a.entries || []).length) tb.innerHTML = `<tr><td colspan="8" class="muted">Denetim kaydi bos</td></tr>`;
   } catch (e) { console.error(e); }
+
+  // --- Password modal ---
+  document.getElementById("changePwBtn").onclick = () => {
+    modal({
+      title: "Sifre degistir",
+      body: `
+        <label>Mevcut sifre <input type="password" id="pw_current" /></label>
+        <label>Yeni sifre (en az 6 karakter) <input type="password" id="pw_new" minlength="6" /></label>
+        <label>Yeni sifre tekrar <input type="password" id="pw_new2" minlength="6" /></label>
+      `,
+      primary: "Guncelle",
+      onPrimary: async () => {
+        const cur = document.getElementById("pw_current").value;
+        const n1 = document.getElementById("pw_new").value;
+        const n2 = document.getElementById("pw_new2").value;
+        if (!cur || n1.length < 6) { toast("Mevcut sifre + en az 6 karakterli yeni sifre", "warn"); return; }
+        if (n1 !== n2) { toast("Yeni sifreler eslesmiyor", "warn"); return; }
+        try {
+          await api("/api/v1/me/password", { method: "POST", body: JSON.stringify({ current_password: cur, new_password: n1 }) });
+          toast("Sifre guncellendi", "ok");
+        } catch (e) { toast("Hata: " + e.message, "error", 5000); }
+      },
+    });
+  };
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])
+    );
+  }
 })();

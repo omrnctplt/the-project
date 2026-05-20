@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Kurulum{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Ilk kurulum</h1>
+    <div class="subtitle">Sisteminize uygun bir model secin — Inference Hub geri kalanini halleder.</div>
+  </div>
+</div>
+
+<section class="card" style="margin-bottom:1rem;">
+  <h2>Donanim ozetiniz</h2>
+  <div class="grid three" id="hwStats"></div>
+</section>
+
+<section class="card">
+  <h2>Bir baslangic modeli secin</h2>
+  <p class="muted">Asagidaki modeller donaniminiza uyumlu olarak siralanmistir. Yesil cerceveli olanlar mevcut profilinizde dogrudan calisir. <strong>Hicbiri zorunlu degil</strong> — daha sonra "Modeller" sayfasindan istediginiz kadar ekleyebilirsiniz.</p>
+
+  <div class="filter-row" id="recCatFilter">
+    <button data-cat="" class="active">Hepsi</button>
+    <button data-cat="fallback">En kucuk (fallback)</button>
+    <button data-cat="text">Metin</button>
+    <button data-cat="code">Kod</button>
+    <button data-cat="reasoning">Reasoning</button>
+  </div>
+
+  <div class="model-grid" id="recList"></div>
+
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-top:1.5rem; padding-top:1rem; border-top:1px solid var(--border);">
+    <a href="/ui/chat" class="muted">Bos baslayabilirim — model yok &rarr;</a>
+    <span class="muted" id="recHint"></span>
+  </div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script src="/static/onboarding.js"></script>
+{% endblock %}
