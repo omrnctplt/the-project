@@ -1,13 +1,12 @@
 {% extends "base.html" %}
 {% block title %}Sohbet{% endblock %}
-{% block shell %}
-<div class="chat-shell">
+{% block body_class %}page-chat{% endblock %}
+{% block content %}
+<div class="chat-layout">
   <aside class="chat-sidebar">
     <button class="new-chat-btn" id="newChatBtn">+ Yeni sohbet</button>
     <div class="muted" style="font-size:0.7rem; text-transform:uppercase; letter-spacing:0.08em; padding:0.5rem 0.25rem 0.1rem;">Gecmis</div>
     <ul class="conv-list" id="convList"></ul>
-    <div style="flex:1;"></div>
-    <a href="/ui/chat" class="nav-item" style="opacity:0.7; padding:0.5rem; font-size:0.8rem; text-align:center; color:var(--muted);">← Ana panele don</a>
   </aside>
   <div class="chat-main">
     <div class="chat-header">
@@ -17,7 +16,6 @@
           <input type="checkbox" id="streamToggle" checked /> Streaming
         </label>
         <select id="adminModel" class="hidden"><option value="">(otomatik)</option></select>
-        <a href="/ui/dashboard" class="muted" style="font-size:0.8rem;">Panel</a>
       </div>
     </div>
     <div class="chat-body" id="chatBody"></div>

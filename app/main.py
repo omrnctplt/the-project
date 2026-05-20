@@ -920,9 +920,17 @@ async def users(_=Depends(auth.require_admin)) -> dict[str, Any]:
 
 # --- Basit UI ---
 
-@app.get("/", include_in_schema=False)
-async def root() -> RedirectResponse:
-    return RedirectResponse(url="/ui/login")
+@app.get("/", include_in_schema=False, response_class=HTMLResponse)
+async def root() -> HTMLResponse:
+    # Token client-side localStorage'da; minimal HTML ile yonlendiriyoruz.
+    return HTMLResponse(
+        "<!doctype html><meta charset='utf-8'>"
+        "<title>Inference Hub</title>"
+        "<script>"
+        "  var t = localStorage.getItem('token');"
+        "  location.replace(t ? '/ui/dashboard' : '/ui/login');"
+        "</script>"
+    )
 
 
 @app.get("/ui/login", include_in_schema=False, response_class=HTMLResponse)

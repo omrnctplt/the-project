@@ -67,9 +67,9 @@
       try {
         const headers = { "Authorization": `Bearer ${data.access_token}` };
         const ob = await fetch("/api/v1/onboarding/state", { headers }).then(r => r.json());
-        location.href = ob.needs_onboarding ? "/ui/onboarding" : "/ui/chat";
+        location.href = ob.needs_onboarding ? "/ui/onboarding" : "/ui/dashboard";
       } catch {
-        location.href = "/ui/chat";
+        location.href = "/ui/dashboard";
       }
     } catch (ex) {
       err.textContent = ex.message;

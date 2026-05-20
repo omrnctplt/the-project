@@ -727,14 +727,24 @@ pre { padding: 0.85rem; overflow-x: auto; line-height: 1.45; }
 .model-card.fits-current { border-color: rgba(74,222,128,0.25); }
 
 /* =============================================
-   Chat
+   Chat — app-shell icinde tam yukseklik layout
    ============================================= */
-.chat-shell {
+body.page-chat .main-area > main {
+  padding: 0;
+  max-width: none;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+.chat-layout {
   display: grid;
   grid-template-columns: 240px 1fr;
-  height: calc(100vh - 0px);
+  height: 100vh;
   background: var(--bg);
+  min-width: 0;
 }
+/* eski .chat-shell uyumlulugu (kullanilmiyor ama style kalsin) */
+.chat-shell { display: grid; grid-template-columns: 240px 1fr; height: 100vh; background: var(--bg); }
 .chat-sidebar {
   background: var(--bg-elev);
   border-right: 1px solid var(--border);

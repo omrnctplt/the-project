@@ -5,7 +5,7 @@
   const isLogin = path.endsWith("/ui/login");
 
   if (!token && !isLogin) { location.href = "/ui/login"; return; }
-  if (token && isLogin)   { location.href = "/ui/chat"; return; }
+  if (token && isLogin)   { location.href = "/ui/dashboard"; return; }
 
   let user = {};
   if (!isLogin) {
