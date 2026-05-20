@@ -1,0 +1,60 @@
+name: tests
+
+on:
+  push:
+    branches: [main, yasin]
+  pull_request:
+    branches: [main]
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            app/requirements.txt
+            simulator/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r app/requirements.txt
+          pip install pytest
+
+      - name: Run unit tests
+        run: pytest -q tests/
+
+      - name: Import check (modules)
+        run: |
+          python -c "from app import main, capacity, orchestrator, hwprobe, config, models, router, state, metrics, audit, usage, auth, sysmonitor; print('all imports OK')"
+        env:
+          JWT_SECRET: ci-only-secret-do-not-use-in-prod
+
+  docker-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      JWT_SECRET: ci-only-secret-do-not-use-in-prod
+      ADMIN_PASSWORD: ci-admin
+      GRAFANA_ADMIN_PASSWORD: ci-grafana
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate docker-compose syntax
+        run: docker compose config --quiet
+
+      - name: Build gateway image
+        run: docker build -t inference-hub-gateway:ci ./app
+
+      - name: Smoke test gateway image
+        run: |
+          docker run --rm -e JWT_SECRET=ci-secret \
+            inference-hub-gateway:ci \
+            python -c "from app.main import app; print('routes:', len(app.routes))"

@@ -1,5 +1,11 @@
 # Inference Hub
 
+[![tests](https://github.com/omrnctplt/the-project/actions/workflows/test.yml/badge.svg)](https://github.com/omrnctplt/the-project/actions/workflows/test.yml)
+[![python](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/)
+[![fastapi](https://img.shields.io/badge/FastAPI-0.115-009688.svg)](https://fastapi.tiangolo.com/)
+[![docker](https://img.shields.io/badge/docker-compose-2496ED.svg)](https://docs.docker.com/compose/)
+[![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
 > **Departman bazli, donanima gore kendini ayarlayan, tek `docker compose up` ile ayaga kalkan, on-premise LLM gateway.**
 
 Kucuk ekipler icin Ollama'nin onunde duran bir yonlendirme katmani. Sistem ilk acilista donanimi olcer, uygun **kapasite profilini** secer, **departman + prompt** tabanli akilli yonlendirme yapar, butun istekleri **denetler**. UI, REST API, Prometheus metrikleri ve Grafana paneli kutudan cikar cikmaz hazirdir.
