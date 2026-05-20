@@ -2,6 +2,14 @@
 
 Tum dikkat ceken degisiklikler bu dosyada listelenir. Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardina yakindir.
 
+## [0.3.1] - 2026-05-20
+
+### Added
+- **GitHub Actions CI** (`.github/workflows/test.yml`) — her push'ta pytest + Docker compose syntax + gateway image smoke test
+- **LICENSE** dosyasi (MIT)
+- **`.gitattributes`** — LF/CRLF normalize (Windows + Linux/Mac calisanlar arasinda uyari yok)
+- **README badge'leri** — tests, python, fastapi, docker, license
+
 ## [0.3.0] - 2026-05-20
 
 Buyuk UI/UX overhauli + DevOps-grade tooling.

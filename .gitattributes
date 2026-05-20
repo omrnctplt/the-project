@@ -1,0 +1,31 @@
+# Normalize line endings to LF on commit; checkout uses platform default.
+# Bu sayede Windows + Linux/Mac calisanlar arasinda LF/CRLF uyarisi olmaz.
+
+* text=auto eol=lf
+
+# Acik metin (LF her zaman)
+*.py        text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+*.json      text eol=lf
+*.md        text eol=lf
+*.sh        text eol=lf
+*.html      text eol=lf
+*.css       text eol=lf
+*.js        text eol=lf
+Dockerfile  text eol=lf
+Makefile    text eol=lf
+
+# Windows-only scriptler CRLF kalsin
+*.ps1       text eol=crlf
+*.bat       text eol=crlf
+*.cmd       text eol=crlf
+
+# Binary dosyalar
+*.png       binary
+*.jpg       binary
+*.gif       binary
+*.ico       binary
+*.pdf       binary
+*.zip       binary
+*.gz        binary
