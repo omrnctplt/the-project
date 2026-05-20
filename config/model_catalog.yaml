@@ -132,6 +132,78 @@ models:
     vram_gb: 2.8
     profile: "Microsoft Phi-4 mini — STEM/reasoning, parametre basina yogun bilgi."
 
+  phi4-14b:
+    ollama_tag: "phi4:14b"
+    category: reasoning
+    parameters_b: 14.0
+    ram_gb: 9.0
+    vram_gb: 9.0
+    profile: "Microsoft Phi-4 14B — dense reasoning + STEM."
+
+  mistral-7b:
+    ollama_tag: "mistral:7b"
+    category: text
+    parameters_b: 7.2
+    ram_gb: 4.8
+    vram_gb: 4.8
+    profile: "Mistral 7B — klasik dengeli, multilingual."
+
+  mistral-small-3.2:
+    ollama_tag: "mistral-small3.2"
+    category: text
+    parameters_b: 24.0
+    ram_gb: 16.0
+    vram_gb: 16.0
+    profile: "Mistral Small 3.2 — 24B dense, production-grade multilingual."
+
+  llama3.3-70b:
+    ollama_tag: "llama3.3:70b-instruct-q4_K_M"
+    category: text
+    parameters_b: 70.0
+    ram_gb: 42.0
+    vram_gb: 42.0
+    profile: "Meta Llama 3.3 70B — frontier kalite, agir donanim gerek."
+
+  deepseek-v3-pruned-coder:
+    ollama_tag: "deepseek-v3:411b-pruned-coder"
+    category: code
+    parameters_b: 411.0
+    ram_gb: 240.0
+    vram_gb: 240.0
+    profile: "DeepSeek V3 411B pruned coder — datacenter-grade, lab kullanimi."
+
+  deepseek-r1-14b:
+    ollama_tag: "deepseek-r1:14b"
+    category: reasoning
+    parameters_b: 14.0
+    ram_gb: 9.0
+    vram_gb: 9.0
+    profile: "DeepSeek R1 14B distill — reasoning, orta donanim."
+
+  qwen2.5-coder-14b:
+    ollama_tag: "qwen2.5-coder:14b"
+    category: code
+    parameters_b: 14.0
+    ram_gb: 9.0
+    vram_gb: 9.0
+    profile: "Qwen2.5 Coder 14B — agir coding, refactor, big-context."
+
+  smollm2-360m:
+    ollama_tag: "smollm2:360m"
+    category: fallback
+    parameters_b: 0.36
+    ram_gb: 0.4
+    vram_gb: 0.4
+    profile: "HF SmolLM2 — cok hafif, edge cihazlar."
+
+  granite3.1-8b:
+    ollama_tag: "granite3.1-dense:8b"
+    category: text
+    parameters_b: 8.2
+    ram_gb: 5.5
+    vram_gb: 5.5
+    profile: "IBM Granite 3.1 — enterprise text, tool-calling."
+
   # --------- Code ---------
   qwen2.5-coder-1.5b:
     ollama_tag: "qwen2.5-coder:1.5b"
@@ -184,40 +256,57 @@ models:
     profile: "Cok hafif yedek model. Genelde her zaman hazir."
 
 departments:
+  # resource_class    : light / medium / heavy (kaynak ayriminin sinyali)
+  # preferred_size    : small / medium / large (router model boyut tercihi)
+  # rate_limit_per_min: dakikada maks istek
+  # daily_token_quota : (opsiyonel) gunluk token tavani
+
   hr:
     label: "Insan Kaynaklari"
     primary_category: text
     allowed_categories: [text, fallback]
+    resource_class: light
+    preferred_size: small
     rate_limit_per_min: 30
 
   engineering:
     label: "Muhendislik / Yazilim"
     primary_category: code
     allowed_categories: [code, text, reasoning, fallback]
+    resource_class: heavy
+    preferred_size: large
     rate_limit_per_min: 60
 
   legal:
     label: "Hukuk"
     primary_category: text
     allowed_categories: [text, fallback]
+    resource_class: medium
+    preferred_size: medium
     rate_limit_per_min: 20
 
   finance:
     label: "Finans / Muhasebe"
     primary_category: reasoning
     allowed_categories: [reasoning, text, fallback]
+    resource_class: medium
+    preferred_size: medium
     rate_limit_per_min: 30
 
   marketing:
     label: "Pazarlama"
     primary_category: text
     allowed_categories: [text, fallback]
+    resource_class: light
+    preferred_size: small
     rate_limit_per_min: 30
 
   general:
     label: "Genel Kullanici"
     primary_category: text
     allowed_categories: [text, fallback]
+    resource_class: light
+    preferred_size: small
     rate_limit_per_min: 15
 
 # Kurallar yukaridan asagi degerlendirilir; ilk eslesen kazanir.

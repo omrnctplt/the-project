@@ -540,6 +540,108 @@ pre { padding: 0.85rem; overflow-x: auto; line-height: 1.45; }
 }
 
 /* =============================================
+   Bootstrap progress
+   ============================================= */
+.bootstrap-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(11, 13, 18, 0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  animation: fade-in 200ms ease-out;
+}
+.bootstrap-overlay .panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem 1.75rem;
+  max-width: 520px;
+  width: 100%;
+  box-shadow: var(--shadow-2);
+}
+.bootstrap-overlay h2 {
+  margin: 0 0 0.25rem;
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.bootstrap-overlay .pulse {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 0 var(--accent);
+  animation: pulse 1.4s infinite;
+}
+.bootstrap-overlay .sub {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin-bottom: 1.25rem;
+}
+.boot-steps {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.boot-step {
+  display: flex;
+  gap: 0.7rem;
+  align-items: flex-start;
+  padding: 0.55rem 0.7rem;
+  background: var(--bg-elev);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  transition: border-color 200ms, background 200ms;
+}
+.boot-step.running { border-color: var(--accent); background: var(--accent-soft); }
+.boot-step.ok      { border-color: rgba(74,222,128,0.3); }
+.boot-step.warn    { border-color: rgba(251,191,36,0.35); }
+.boot-step.error   { border-color: rgba(248,113,113,0.4); background: var(--danger-soft); }
+.boot-step .icon {
+  width: 18px; height: 18px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+.boot-step.running .icon::after {
+  content: "";
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  border-top-color: transparent;
+  animation: spin 0.7s linear infinite;
+}
+.boot-step.ok      .icon::after { content: "✓"; color: var(--ok); font-weight: 700; }
+.boot-step.warn    .icon::after { content: "!"; color: var(--warn); font-weight: 700; }
+.boot-step.skipped .icon::after { content: "—"; color: var(--muted-2); }
+.boot-step.error   .icon::after { content: "×"; color: var(--danger); font-weight: 700; }
+.boot-step.pending .icon::after { content: "·"; color: var(--muted-2); }
+.boot-step .body { flex: 1; }
+.boot-step .label { color: var(--text); font-weight: 500; }
+.boot-step .detail { color: var(--muted); font-size: 0.78rem; margin-top: 0.15rem; }
+.boot-step .ms { color: var(--muted-2); font-size: 0.72rem; font-variant-numeric: tabular-nums; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(110,155,255,0.6); }
+  70%  { box-shadow: 0 0 0 12px rgba(110,155,255,0); }
+  100% { box-shadow: 0 0 0 0 rgba(110,155,255,0); }
+}
+
+/* =============================================
    Footer
    ============================================= */
 .footer {

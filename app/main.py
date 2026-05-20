@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
@@ -109,43 +110,110 @@ def _make_plan(state: AppState) -> dict[str, Any]:
 
 
 async def _bootstrap(state: AppState) -> None:
-    log.info("Bootstrap basliyor...")
+    bt = state.bootstrap
+    bt.add("schema",   "Veritabani semalari hazirlaniyor")
+    bt.add("users",    "Demo kullanicilar seed ediliyor")
+    bt.add("hw",       "Donanim taraniyor")
+    bt.add("catalog",  "Model katalogu yukleniyor")
+    bt.add("plan",     "Kapasite plani uretiliyor")
+    bt.add("orch",     "Orchestrator + router baslatiliyor")
+    bt.add("seed",     "Seed model indiriliyor (lazy)")
+    bt.add("warmup",   "Modeller isiniyor (opsiyonel)")
+    log.info("Bootstrap basliyor (7+ adim)...")
 
-    audit.ensure_schema()
-    usage.ensure_schema()
-    auth.seed_default_users()
+    bt.start("schema")
+    try:
+        audit.ensure_schema()
+        usage.ensure_schema()
+        bt.finish("schema", "ok", "audit + usage tablolari hazir")
+    except Exception as exc:
+        bt.finish("schema", "error", str(exc))
+        log.exception("Schema hata: %s", exc)
+        raise
 
-    log.info("Donanim profili cikariliyor...")
+    bt.start("users")
+    try:
+        auth.seed_default_users()
+        bt.finish("users", "ok")
+    except Exception as exc:
+        bt.finish("users", "warn", str(exc))
+        log.warning("User seed hata: %s", exc)
+
+    bt.start("hw")
     profile = hwprobe.probe()
     hwprobe.write_profile(profile)
     state.hw_profile = profile
+    bt.finish(
+        "hw", "ok",
+        f"{profile['cpu']['logical_cores']} CPU, "
+        f"{profile['memory']['effective_total_gb']:.1f} GB RAM, "
+        f"GPU: {profile['gpu']['vram_total_gb'] if profile['gpu']['available'] else 'yok'}"
+    )
     log.info(
-        "Donanim: %s CPU, %.1f GB effective RAM (kaynak: %s), GPU=%s",
+        "Donanim: %s CPU, %.1f GB RAM (%s), GPU=%s",
         profile["cpu"]["logical_cores"],
         profile["memory"]["effective_total_gb"],
         profile["memory"].get("effective_source", "?"),
         profile["gpu"]["vram_total_gb"] if profile["gpu"]["available"] else "yok",
     )
 
-    state.catalog = cfg.load_catalog()
-    state.runtime_config = cfg.load_runtime_config()
-    _make_plan(state)
-    _refresh_capacity_metrics(state)
+    bt.start("catalog")
+    try:
+        state.catalog = cfg.load_catalog()
+        state.runtime_config = cfg.load_runtime_config()
+        bt.finish("catalog", "ok", f"{len(state.catalog.get('models', {}))} model tanimi yuklendi")
+    except Exception as exc:
+        bt.finish("catalog", "error", str(exc))
+        raise
 
+    bt.start("plan")
+    try:
+        _make_plan(state)
+        _refresh_capacity_metrics(state)
+        cap = state.capacity
+        bt.finish(
+            "plan", "ok",
+            f"Profil: {cap.get('profile')}, {len(cap.get('active_models') or [])} aktif model, "
+            f"butce {cap.get('budget_used_gb', 0):.1f}/{cap.get('budget_total_gb', 0):.1f} GB"
+        )
+    except Exception as exc:
+        bt.finish("plan", "error", str(exc))
+        raise
+
+    bt.start("orch")
     orch = _build_orchestrator(state)
     state.orchestrator = orch
     state.router = Router(state.catalog, orch)
+    bt.finish("orch", "ok", f"max {orch.max_concurrent_requests} eszamanli istek")
 
     state.ready = True
-    log.info("Gateway hazir. Seed model arka planda iniyor olabilir.")
+    state.bootstrap.finished_at = time.time()
+    log.info("Gateway hazir (UI'dan kullanilabilir). Seed model arka planda iniyor olabilir.")
 
     async def _seed_loop() -> None:
+        bt.start("seed", "ollama'ya baglaniyor...")
         try:
             await orch.pull_initial()
+            seed_id = orch._pick_seed_model_id()
+            if seed_id:
+                st = orch.get_state(seed_id)
+                bt.finish("seed", "ok" if (st and st.pulled) else "warn",
+                          f"seed: {seed_id} ({'hazir' if st and st.pulled else 'pull devam ediyor'})")
+            else:
+                bt.finish("seed", "skipped", "aktif model yok")
+        except Exception as exc:
+            bt.finish("seed", "warn", f"seed indirilemedi: {exc}")
+            log.warning("Seed pull hatasi: %s", exc)
+
+        bt.start("warmup")
+        try:
             if state.catalog.get("defaults", {}).get("warmup_on_start"):
                 await orch.warmup_all()
+                bt.finish("warmup", "ok")
+            else:
+                bt.finish("warmup", "skipped", "warmup_on_start kapali (lazy)")
         except Exception as exc:
-            log.exception("Seed pull/warmup hatasi: %s", exc)
+            bt.finish("warmup", "warn", str(exc))
 
     state.tasks.append(asyncio.create_task(_seed_loop()))
     state.tasks.append(asyncio.create_task(orch.idle_sweep_loop()))
@@ -198,6 +266,19 @@ def _state(request: Request) -> AppState:
 @app.get("/healthz", include_in_schema=False)
 async def healthz() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/api/v1/system/bootstrap", include_in_schema=False)
+async def bootstrap_status(request: Request) -> dict[str, Any]:
+    """Bootstrap state'i — frontend buradan canli takip eder.
+
+    Token gerektirmez; sistem hazirlanirken login ekraninda gosterilebilsin.
+    """
+    state = _state(request)
+    return {
+        "ready": bool(state.ready),
+        **state.bootstrap.to_dict(),
+    }
 
 
 @app.get("/readyz", include_in_schema=False)
@@ -508,6 +589,68 @@ async def get_catalog(request: Request, _=Depends(auth.current_principal)) -> di
         "departments": state.catalog.get("departments", {}),
         "overridden": list(overrides.keys()),
     }
+
+
+@app.post("/api/v1/system/catalog/dry-run")
+async def catalog_dry_run(
+    body: CatalogModelRequest,
+    request: Request,
+    _=Depends(auth.require_admin),
+) -> dict[str, Any]:
+    """Modeli kataloga eklemeden once: butce uygun mu, hangi profilde aktif olur?"""
+    state = _state(request)
+    cap = state.capacity or {}
+    accelerator = cap.get("accelerator", "cpu")
+    budget_total = float(cap.get("budget_total_gb", 0) or 0)
+    budget_used = float(cap.get("budget_used_gb", 0) or 0)
+    budget_free = max(0.0, budget_total - budget_used)
+
+    size_gb = float(body.vram_gb if (accelerator == "gpu" and body.vram_gb) else body.ram_gb)
+    fits_current = size_gb <= budget_free
+    fits_total = size_gb <= budget_total
+
+    # Profil bazli ne olur?
+    profiles_result = {}
+    for pname, pcfg in capacity_mod.PROFILES.items():
+        ratio = pcfg["budget_ratio_gpu"] if accelerator == "gpu" else pcfg["budget_ratio_cpu"]
+        hw_total = (
+            float((state.hw_profile.get("gpu") or {}).get("vram_total_gb") or 0)
+            if accelerator == "gpu"
+            else float((state.hw_profile.get("memory") or {}).get("effective_total_gb") or 0)
+        )
+        prof_budget = max(0.5, hw_total * ratio)
+        profiles_result[pname] = {
+            "budget_total_gb": round(prof_budget, 2),
+            "fits": size_gb <= prof_budget,
+            "category_allowed": body.category in pcfg["allowed_categories"],
+        }
+
+    return {
+        "model_id": body.model_id,
+        "size_gb": size_gb,
+        "accelerator": accelerator,
+        "current_profile": cap.get("profile"),
+        "current_budget_free_gb": round(budget_free, 2),
+        "current_budget_total_gb": round(budget_total, 2),
+        "fits_current_free": fits_current,
+        "fits_current_total": fits_total,
+        "profiles": profiles_result,
+        "verdict": (
+            "active" if fits_current else
+            ("passive_in_current_profile" if fits_total else "too_large_for_hardware")
+        ),
+        "advice": _advice_for_verdict(fits_current, fits_total, accelerator),
+    }
+
+
+def _advice_for_verdict(fits_current: bool, fits_total: bool, accel: str) -> str:
+    if fits_current:
+        return "Model mevcut butceye sigiyor — aktif olarak yuklenebilir."
+    if fits_total:
+        return ("Mevcut profil butcesi dolu ama donanim toplaminda yer var. "
+                "Daha buyuk bir profil (balanced/performance) secebilirsiniz.")
+    return ("Model bu donanim icin cok buyuk. Daha kucuk bir varyant secin "
+            f"(orn: 7B yerine 3B) veya {'GPU' if accel == 'cpu' else 'daha buyuk bir GPU'} gerekli.")
 
 
 @app.post("/api/v1/system/catalog/models")

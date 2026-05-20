@@ -76,9 +76,10 @@
     <label class="full">Aciklama (opsiyonel)
       <input type="text" id="cm_profile" placeholder="orn: Qwen3, hizli ve cok dilli" />
     </label>
-    <div class="full">
-      <button type="button" id="cm_inspect">Ollama'dan boyut tahmin et</button>
-      <button type="submit" class="primary">Katalog'a ekle ve yeniden planla</button>
+    <div class="full" style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+      <button type="button" id="cm_inspect">Boyutu tahmin et</button>
+      <button type="button" id="cm_dryrun">Butceye sigar mi? (dry-run)</button>
+      <button type="submit" class="primary">Katalog'a ekle</button>
     </div>
   </form>
 

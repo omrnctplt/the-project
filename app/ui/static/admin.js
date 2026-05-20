@@ -108,6 +108,47 @@
   }
   refreshCatalog();
 
+  document.getElementById("cm_dryrun").addEventListener("click", async () => {
+    const body = collectCatalogForm();
+    if (!body) return;
+    try {
+      const r = await api("/api/v1/system/catalog/dry-run", { method: "POST", body: JSON.stringify(body) });
+      const lines = [
+        `Model: ${r.model_id} (${r.size_gb.toFixed(1)} GB, ${r.accelerator.toUpperCase()})`,
+        `Mevcut profil: ${r.current_profile} — bos butce ${r.current_budget_free_gb.toFixed(1)}/${r.current_budget_total_gb.toFixed(1)} GB`,
+        `Sonuc: ${r.verdict}`,
+        ``,
+        r.advice,
+        ``,
+        `Profil bazli:`,
+        ...Object.entries(r.profiles).map(([n, p]) =>
+          `  ${n.padEnd(12)} butce ${p.budget_total_gb.toFixed(1)} GB | sigar: ${p.fits ? "evet" : "hayir"} | kategori OK: ${p.category_allowed ? "evet" : "hayir"}`
+        ),
+      ];
+      alert(lines.join("\n"));
+    } catch (err) { toast("Dry-run hata: " + err.message, "error", 5000); }
+  });
+
+  function collectCatalogForm() {
+    const body = {
+      model_id: document.getElementById("cm_model_id").value.trim(),
+      ollama_tag: document.getElementById("cm_ollama_tag").value.trim(),
+      category: document.getElementById("cm_category").value,
+      ram_gb: parseFloat(document.getElementById("cm_ram_gb").value),
+    };
+    if (!body.model_id || !body.ollama_tag || isNaN(body.ram_gb)) {
+      toast("Model ID, tag ve RAM zorunlu", "warn");
+      return null;
+    }
+    const pb = parseFloat(document.getElementById("cm_parameters_b").value);
+    const vr = parseFloat(document.getElementById("cm_vram_gb").value);
+    const prof = document.getElementById("cm_profile").value.trim();
+    if (!isNaN(pb)) body.parameters_b = pb;
+    if (!isNaN(vr)) body.vram_gb = vr;
+    if (prof) body.profile = prof;
+    return body;
+  }
+
   document.getElementById("cm_inspect").addEventListener("click", async () => {
     const tag = document.getElementById("cm_ollama_tag").value.trim();
     if (!tag) { toast("Once Ollama tag girin.", "warn"); return; }

@@ -9,6 +9,34 @@ Sonra alttaki riv satirini yorum disina alin:
 ![Demo](docs/demo.gif)
 -->
 
+## Hizli Baslangic (DevOps-grade)
+
+```bash
+# 1) Tek komut: preflight + build + up
+make up
+
+# Alternatif: dogrudan compose
+docker compose up -d --build
+```
+
+`make up` su adimlari yapar:
+- `scripts/preflight.sh` (Windows: `scripts/preflight.ps1`) — port cakismasi, Docker daemon, disk, RAM kontrolu
+- `.env` yoksa otomatik `.env.example`'dan kopyalanir
+- Compose build + up (gateway, ollama, prometheus, grafana)
+- Servis URL'leri yazdirilir
+
+Tum komutlar:
+```bash
+make help        # Tum komutlari listele
+make up          # Preflight + ayaga kaldir
+make down        # Durdur (volume korunur)
+make restart     # Down + up
+make logs        # Canli log akisi
+make health      # Tum endpoint'leri probe et
+make test        # Birim testleri
+make reset       # Volume dahil her seyi sil
+```
+
 ## Servisler ve Yayin URL'leri
 
 `docker compose up -d` sonrasi tarayicidan asagidaki adreslerle ulasilir (host PC'den):
