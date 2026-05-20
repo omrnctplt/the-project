@@ -40,6 +40,10 @@ jobs:
   docker-build:
     runs-on: ubuntu-latest
     timeout-minutes: 8
+    env:
+      JWT_SECRET: ci-only-secret-do-not-use-in-prod
+      ADMIN_PASSWORD: ci-admin
+      GRAFANA_ADMIN_PASSWORD: ci-grafana
     steps:
       - uses: actions/checkout@v4
 
