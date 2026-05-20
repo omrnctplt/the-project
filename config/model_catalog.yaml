@@ -59,6 +59,79 @@ models:
     vram_gb: 2.0
     profile: "Google Gemma 2 — dengeli metin modeli."
 
+  # --------- Yeni nesil (Mayis 2026) ---------
+  gemma4-e2b:
+    ollama_tag: "gemma4:e2b"
+    category: text
+    parameters_b: 2.3
+    ram_gb: 1.8
+    vram_gb: 1.8
+    profile: "Google Gemma 4 E2B — multimodal, 256K context, Nisan 2026."
+
+  gemma4-e4b:
+    ollama_tag: "gemma4:e4b"
+    category: text
+    parameters_b: 4.5
+    ram_gb: 3.2
+    vram_gb: 3.2
+    profile: "Google Gemma 4 E4B — multimodal, dengeli, Nisan 2026."
+
+  gemma3-1b:
+    ollama_tag: "gemma3:1b"
+    category: text
+    parameters_b: 1.0
+    ram_gb: 1.0
+    vram_gb: 1.0
+    profile: "Google Gemma 3 — kucuk, hizli, multilingual."
+
+  gemma3-4b:
+    ollama_tag: "gemma3:4b"
+    category: text
+    parameters_b: 4.0
+    ram_gb: 3.0
+    vram_gb: 3.0
+    profile: "Google Gemma 3 — dengeli metin, vision + tool calling destekli."
+
+  qwen3-0.6b:
+    ollama_tag: "qwen3:0.6b"
+    category: fallback
+    parameters_b: 0.6
+    ram_gb: 0.7
+    vram_gb: 0.7
+    profile: "Qwen3 en kucuk — ultra hafif yedek model."
+
+  qwen3-1.7b:
+    ollama_tag: "qwen3:1.7b"
+    category: text
+    parameters_b: 1.7
+    ram_gb: 1.5
+    vram_gb: 1.5
+    profile: "Qwen3 — Turkce dahil cok dilli, hizli yeni nesil."
+
+  qwen3-4b:
+    ollama_tag: "qwen3:4b"
+    category: text
+    parameters_b: 4.0
+    ram_gb: 3.0
+    vram_gb: 3.0
+    profile: "Qwen3 — orta boy metin, yeni nesil."
+
+  qwen3-8b:
+    ollama_tag: "qwen3:8b"
+    category: text
+    parameters_b: 8.0
+    ram_gb: 5.5
+    vram_gb: 5.5
+    profile: "Qwen3 — buyuk metin/genel amac, yeni nesil."
+
+  phi4-mini:
+    ollama_tag: "phi4-mini"
+    category: reasoning
+    parameters_b: 3.8
+    ram_gb: 2.8
+    vram_gb: 2.8
+    profile: "Microsoft Phi-4 mini — STEM/reasoning, parametre basina yogun bilgi."
+
   # --------- Code ---------
   qwen2.5-coder-1.5b:
     ollama_tag: "qwen2.5-coder:1.5b"

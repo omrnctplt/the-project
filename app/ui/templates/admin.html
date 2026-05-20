@@ -1,8 +1,15 @@
 {% extends "base.html" %}
 {% block title %}Yonetim{% endblock %}
 {% block content %}
+<div class="page-header">
+  <div>
+    <h1>Yonetim</h1>
+    <div class="subtitle">Profil, model katalogu, kullanici ve denetim islemleri.</div>
+  </div>
+</div>
+
 <section class="card">
-  <h1>Calisma Zamani Konfigurasyonu</h1>
+  <h2>Calisma zamani konfigurasyonu</h2>
   <form id="configForm" class="grid two">
     <label>Kapasite profili
       <select id="profile">

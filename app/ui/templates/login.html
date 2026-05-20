@@ -2,18 +2,29 @@
 {% block title %}Giris{% endblock %}
 {% block content %}
 <div class="card narrow">
-  <h1>Giris</h1>
-  <p class="muted">Departmaniza atanmis hesabinizla giris yapin. Demo amacli kullanicilar: <code>hr_user/hr123</code>, <code>dev_user/dev123</code>, <code>admin/admin</code>.</p>
+  <h1>Tekrar hos geldiniz</h1>
+  <p class="muted">Departmaniza atanmis hesabinizla giris yapin.</p>
   <form id="loginForm">
     <label>Kullanici adi
-      <input type="text" id="username" autocomplete="username" required />
+      <input type="text" id="username" autocomplete="username" required autofocus />
     </label>
     <label>Sifre
       <input type="password" id="password" autocomplete="current-password" required />
     </label>
-    <button type="submit" class="primary">Giris yap</button>
+    <button type="submit" class="primary" style="width:100%; justify-content:center;">Giris yap</button>
     <p id="loginError" class="error hidden"></p>
   </form>
+  <details style="margin-top:1.25rem;">
+    <summary class="muted" style="cursor:pointer;">Demo hesaplari</summary>
+    <table class="kv" style="margin-top:0.5rem;">
+      <tr><td>admin</td><td><code>admin</code> · yonetici</td></tr>
+      <tr><td>hr_user</td><td><code>hr123</code> · IK</td></tr>
+      <tr><td>dev_user</td><td><code>dev123</code> · muhendislik</td></tr>
+      <tr><td>finance_user</td><td><code>fin123</code> · finans</td></tr>
+      <tr><td>legal_user</td><td><code>legal123</code> · hukuk</td></tr>
+      <tr><td>guest</td><td><code>guest</code> · genel</td></tr>
+    </table>
+  </details>
 </div>
 {% endblock %}
 {% block scripts %}
@@ -25,6 +36,8 @@
     err.classList.add("hidden");
     const username = document.getElementById("username").value;
     const password = document.getElementById("password").value;
+    const btn = e.target.querySelector("button");
+    btn.disabled = true; btn.textContent = "Giris yapiliyor...";
     try {
       const r = await fetch("/login", {
         method: "POST",
@@ -44,6 +57,7 @@
     } catch (ex) {
       err.textContent = ex.message;
       err.classList.remove("hidden");
+      btn.disabled = false; btn.textContent = "Giris yap";
     }
   });
 </script>

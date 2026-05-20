@@ -23,10 +23,10 @@
     };
     try {
       await api("/api/v1/system/config", { method: "PUT", body: JSON.stringify(body) });
-      alert("Konfigurasyon kaydedildi. Sistem yeniden planladi.");
-      location.reload();
+      toast("Konfigurasyon kaydedildi, sistem yeniden planladi.", "ok");
+      setTimeout(() => location.reload(), 700);
     } catch (err) {
-      alert("Kaydetme basarisiz: " + err.message);
+      toast("Kaydetme basarisiz: " + err.message, "error");
     }
   });
 
@@ -79,7 +79,7 @@
           <td><code>${m.ollama_tag}</code></td>
           <td>${m.category}</td>
           <td>${m.ram_gb || "?"} / ${m.vram_gb || "?"} GB</td>
-          <td>${isOverride ? '<span class="badge warn">override</span>' : '<span class="badge">yaml</span>'}</td>
+          <td>${isOverride ? '<span class="badge warn">override</span>' : '<span class="badge plain">yaml</span>'}</td>
           <td>
             <button data-pull="${mid}" class="small">pull</button>
             ${isOverride ? `<button data-del="${mid}" class="small">sil</button>` : ""}
@@ -90,8 +90,8 @@
         b.addEventListener("click", async () => {
           try {
             await api(`/api/v1/system/pull/${encodeURIComponent(b.dataset.pull)}`, { method: "POST" });
-            alert(`Pull baslatildi: ${b.dataset.pull}`);
-          } catch (e) { alert("Hata: " + e.message); }
+            toast(`Pull baslatildi: ${b.dataset.pull}`, "ok");
+          } catch (e) { toast("Hata: " + e.message, "error"); }
         });
       });
       tb.querySelectorAll("button[data-del]").forEach((b) => {
@@ -100,7 +100,8 @@
           try {
             await api(`/api/v1/system/catalog/models/${encodeURIComponent(b.dataset.del)}`, { method: "DELETE" });
             refreshCatalog();
-          } catch (e) { alert("Hata: " + e.message); }
+            toast("Override silindi.", "ok");
+          } catch (e) { toast("Hata: " + e.message, "error"); }
         });
       });
     } catch (e) { console.error(e); }
@@ -109,7 +110,7 @@
 
   document.getElementById("cm_inspect").addEventListener("click", async () => {
     const tag = document.getElementById("cm_ollama_tag").value.trim();
-    if (!tag) { alert("Once Ollama tag girin."); return; }
+    if (!tag) { toast("Once Ollama tag girin.", "warn"); return; }
     try {
       const r = await api("/api/v1/system/ollama/inspect", { method: "POST", body: JSON.stringify({ ollama_tag: tag }) });
       if (r.estimated_ram_gb) document.getElementById("cm_ram_gb").value = r.estimated_ram_gb;
@@ -117,8 +118,8 @@
         const num = parseFloat(String(r.parameter_size).replace(/[^0-9.]/g, ""));
         if (!isNaN(num)) document.getElementById("cm_parameters_b").value = num;
       }
-      alert(`Bulundu: ${r.parameter_size || "?"} param, ~${r.estimated_ram_gb || "?"} GB RAM (tahmin).`);
-    } catch (e) { alert("Inspect basarisiz: " + e.message + " (Modelin Ollama'da pull edilmis olmasi gerekir.)"); }
+      toast(`${r.parameter_size || "?"} parametre · ~${r.estimated_ram_gb || "?"} GB`, "ok");
+    } catch (e) { toast("Inspect basarisiz: " + e.message, "error", 5000); }
   });
 
   document.getElementById("catalogForm").addEventListener("submit", async (e) => {
@@ -138,8 +139,9 @@
     try {
       await api("/api/v1/system/catalog/models", { method: "POST", body: JSON.stringify(body) });
       refreshCatalog();
-      alert("Katalog'a eklendi, plan yenilendi.");
-    } catch (err) { alert("Eklenemedi: " + err.message); }
+      toast("Katalog'a eklendi, plan yenilendi.", "ok");
+      e.target.reset();
+    } catch (err) { toast("Eklenemedi: " + err.message, "error", 5000); }
   });
 
   // ---- Sifre degistir ----
@@ -151,9 +153,9 @@
     };
     try {
       await api("/api/v1/me/password", { method: "POST", body: JSON.stringify(body) });
-      alert("Sifre guncellendi. Tekrar giris yapmaniz gerekebilir.");
+      toast("Sifre guncellendi.", "ok");
       document.getElementById("pwForm").reset();
-    } catch (err) { alert("Sifre degistirilemedi: " + err.message); }
+    } catch (err) { toast("Sifre degistirilemedi: " + err.message, "error", 5000); }
   });
 
   try {

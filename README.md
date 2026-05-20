@@ -153,7 +153,13 @@ Profil her kategoriden **en kucuk** modeli secer. Boyle olunca model katalogunda
 `config/model_catalog.yaml` icinde **temel katalog** tanimli (0.5B ile 7B arasi 11 hafif model). Aktif/pasif ayrimi profil + donanim profilinizden otomatik yapilir.
 
 **Yeni model ekleme (dinamik):**
-1. Ollama Library'den tag'i bulun: https://ollama.com/library — Mayis 2026'da populer olanlar: `qwen3`, `llama3.3`, `gemma3`, `phi4-mini`, `deepseek-r1`, `mistral`, `kimi-k2`.
+1. Ollama Library'den tag'i bulun: https://ollama.com/library — Mayis 2026'da populer olanlar:
+   - `gemma4:e2b` / `gemma4:e4b` — Nisan 2026'da cikan Google Gemma 4, multimodal + 256K context
+   - `gemma3:1b` / `gemma3:4b` — Gemma 3 (klasik)
+   - `qwen3:0.6b` / `qwen3:4b` / `qwen3:8b` — yeni nesil Qwen serisi
+   - `phi4-mini` — Microsoft Phi-4 mini (3.8B)
+   - `deepseek-r1:1.5b` / `7b` — reasoning distill
+   - `mistral:7b`, `kimi-k2`, `llama3.3:70b-instruct-q4_K_M`
 2. Admin paneli → "Model Katalogu" bolumu → Ollama tag'ini girin, "Ollama'dan boyut tahmin et" dugmesine basin (sistem `/api/show` ile gercek boyutu cekip RAM tahmin eder).
 3. "Katalog'a ekle ve yeniden planla" → override `data/catalog_overrides.yaml`'a yazilir, sistem replan yapar.
 

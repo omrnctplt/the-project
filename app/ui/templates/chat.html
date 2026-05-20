@@ -1,27 +1,33 @@
 {% extends "base.html" %}
 {% block title %}Sohbet{% endblock %}
 {% block content %}
-<section class="card">
-  <h1>Sohbet</h1>
-  <p class="muted">Sorgunuz departmaniza atanmis modele otomatik yonlendirilir. Yonetici hesabi spesifik model secebilir.</p>
+<div class="page-header">
+  <div>
+    <h1>Sohbet</h1>
+    <div class="subtitle">Sorgunuz departmaniza atanmis modele otomatik yonlendirilir.</div>
+  </div>
+</div>
 
+<section class="card">
   <div id="adminPicker" class="hidden">
     <label>Model (yonetici icin)
       <select id="adminModel">
-        <option value="">(otomatik)</option>
+        <option value="">(otomatik secim)</option>
       </select>
     </label>
   </div>
 
   <form id="chatForm">
     <label>Prompt
-      <textarea id="prompt" rows="5" placeholder="Sorunuzu yazin..."></textarea>
+      <textarea id="prompt" rows="4" placeholder="Sorunuzu yazin... (Enter ile yeni satir, Ctrl/Cmd+Enter ile gonder)"></textarea>
     </label>
-    <label class="checkbox">
-      <input type="checkbox" id="streamToggle" checked />
-      Streaming (token token gelsin)
-    </label>
-    <button type="submit" class="primary">Gonder</button>
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap;">
+      <label class="checkbox">
+        <input type="checkbox" id="streamToggle" checked />
+        Streaming (token token gelsin)
+      </label>
+      <button type="submit" class="primary">Gonder</button>
+    </div>
   </form>
 
   <div id="chatLog" class="log"></div>

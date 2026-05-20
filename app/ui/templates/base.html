@@ -3,22 +3,24 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>{% block title %}On-Premise AI Gateway{% endblock %}</title>
+  <meta name="theme-color" content="#0b0d12" />
+  <title>{% block title %}Inference Hub{% endblock %} · Inference Hub</title>
   <link rel="stylesheet" href="/static/style.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%236e9bff'/%3E%3Crect x='8' y='8' width='16' height='16' rx='3' fill='%230b0d12'/%3E%3C/svg%3E" />
 </head>
 <body>
   <header class="topbar">
     <div class="brand">
-      <span class="logo">●</span>
-      <span class="name">On-Premise AI Gateway</span>
+      <div class="logo" aria-hidden="true"></div>
+      <span class="name">Inference Hub <span class="dim">/ Yonetim</span></span>
     </div>
     <nav id="mainNav" class="hidden">
-      <a href="/ui/dashboard">Panel</a>
-      <a href="/ui/chat">Sohbet</a>
-      <a href="/ui/admin" data-admin-only>Yonetim</a>
+      <a href="/ui/dashboard" data-nav="dashboard">Genel Bakis</a>
+      <a href="/ui/chat" data-nav="chat">Sohbet</a>
+      <a href="/ui/admin" data-nav="admin" data-admin-only>Yonetim</a>
       <span class="spacer"></span>
       <span class="user" id="navUser"></span>
-      <button id="logoutBtn" class="link">Cikis</button>
+      <button id="logoutBtn" class="link" type="button">Cikis</button>
     </nav>
   </header>
 
@@ -27,8 +29,15 @@
   </main>
 
   <footer class="footer">
-    <span>v0.1.0 &middot; <a href="/metrics" target="_blank">/metrics</a> &middot; <a href="/docs" target="_blank">API</a></span>
+    <span>v0.2.0 &middot;
+      <a href="/metrics" target="_blank" rel="noopener">metrics</a> &middot;
+      <a href="/docs" target="_blank" rel="noopener">API</a> &middot;
+      <a href="http://localhost:3000" target="_blank" rel="noopener">Grafana</a> &middot;
+      <a href="http://localhost:9090" target="_blank" rel="noopener">Prometheus</a>
+    </span>
   </footer>
+
+  <div id="toast-area"></div>
 
   <script src="/static/common.js"></script>
   {% block scripts %}{% endblock %}
