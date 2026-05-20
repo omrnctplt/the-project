@@ -15,7 +15,7 @@ import asyncio
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, AsyncIterator
 
 from .ollama_client import OllamaClient, OllamaError
 
@@ -263,6 +263,58 @@ class Orchestrator:
                 return result
             except OllamaError:
                 state.error = "generate hatasi"
+                raise
+            finally:
+                state.inflight_requests = max(0, state.inflight_requests - 1)
+
+    async def call_stream(
+        self,
+        model_id: str,
+        prompt: str,
+        *,
+        temperature: float | None = None,
+        context_window: int | None = None,
+    ) -> AsyncIterator[dict[str, Any]]:
+        state = self._states.get(model_id)
+        if not state:
+            raise KeyError(f"Bilinmeyen model: {model_id}")
+        if state.status == "passive":
+            raise OllamaError(f"Model pasif: {model_id}")
+        if not state.pulled:
+            if not self.auto_pull:
+                raise OllamaError(
+                    f"Model henuz indirilmemis ve auto_pull kapali: {model_id}"
+                )
+            await self.ensure_pulled(model_id)
+
+        async with self._inflight_sem:
+            state.inflight_requests += 1
+            t0 = time.perf_counter()
+            eval_count_final = 0
+            prompt_count_final = 0
+            try:
+                async for event in self.client.generate_stream(
+                    state.ollama_tag,
+                    prompt,
+                    temperature=temperature,
+                    context_window=context_window,
+                    keep_alive=f"{self.idle_unload_minutes}m",
+                ):
+                    if event.get("eval_count"):
+                        eval_count_final = int(event["eval_count"])
+                    if event.get("prompt_eval_count"):
+                        prompt_count_final = int(event["prompt_eval_count"])
+                    yield event
+                    if event.get("done"):
+                        break
+                elapsed_ms = (time.perf_counter() - t0) * 1000
+                state.last_used_at = time.time()
+                state.status = "loaded"
+                state.total_requests += 1
+                state.total_latency_ms += elapsed_ms
+                state.total_tokens += eval_count_final + prompt_count_final
+            except OllamaError:
+                state.error = "generate_stream hatasi"
                 raise
             finally:
                 state.inflight_requests = max(0, state.inflight_requests - 1)

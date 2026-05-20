@@ -1,0 +1,85 @@
+groups:
+  - name: ai-gateway
+    interval: 30s
+    rules:
+      - alert: GatewayDown
+        expr: up{job="gateway"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: gateway
+        annotations:
+          summary: "Gateway erisilemez"
+          description: "FastAPI gateway (job=gateway) {{ $labels.instance }} 1 dakikadan uzun suredir scrape edilemiyor."
+
+      - alert: HighErrorRate
+        expr: |
+          sum(rate(ai_gateway_requests_total{status="error"}[5m]))
+          /
+          clamp_min(sum(rate(ai_gateway_requests_total[5m])), 1e-9)
+          > 0.05
+        for: 2m
+        labels:
+          severity: warning
+          component: gateway
+        annotations:
+          summary: "Hata orani %5'in uzerinde"
+          description: "Son 5 dakikada toplam isteklerin {{ $value | humanizePercentage }}'i hata dondu."
+
+      - alert: HighFallbackRate
+        expr: |
+          sum(rate(ai_gateway_fallback_total[5m]))
+          /
+          clamp_min(sum(rate(ai_gateway_requests_total[5m])), 1e-9)
+          > 0.25
+        for: 5m
+        labels:
+          severity: warning
+          component: router
+        annotations:
+          summary: "Fallback orani %25'in uzerinde"
+          description: "Istekler routing kurallari yerine fallback modele dusuyor. Kategori bazinda model eksik olabilir."
+
+      - alert: HighRateLimit
+        expr: sum(rate(ai_gateway_rate_limited_total[5m])) > 0.1
+        for: 5m
+        labels:
+          severity: info
+          component: gateway
+        annotations:
+          summary: "Rate-limit reddetmesi artiyor"
+          description: "Son 5 dakikada saniyede {{ $value | printf \"%.2f\" }} istek rate-limit yedi. Departman limitlerini gozden gecirin."
+
+      - alert: HighLatencyP95
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le, model) (rate(ai_gateway_request_latency_seconds_bucket[5m]))
+          ) > 30
+        for: 5m
+        labels:
+          severity: warning
+          component: ollama
+        annotations:
+          summary: "Model {{ $labels.model }} p95 gecikme 30 sn uzerinde"
+          description: "Model {{ $labels.model }} icin son 5 dakika p95 gecikme {{ $value | printf \"%.1f\" }} sn. CPU swap'a iniyor olabilir veya yuk yuksek."
+
+      - alert: NoActiveModel
+        expr: ai_gateway_active_models == 0
+        for: 5m
+        labels:
+          severity: critical
+          component: capacity
+        annotations:
+          summary: "Aktif model yok"
+          description: "Kapasite planlayicisi hicbir modeli aktif olarak isaretleyemedi. lite profili veya daha kucuk modeller deneyin."
+
+      - alert: ModelPullStuck
+        expr: ai_gateway_model_pull_progress > 0 and ai_gateway_model_pull_progress < 1
+        for: 15m
+        labels:
+          severity: warning
+          component: orchestrator
+        annotations:
+          summary: "Model {{ $labels.model }} pull 15 dakikadir asili"
+          description: "Pull progress {{ $value | humanizePercentage }} ve 15 dakikadir ilerlemiyor. Ag baglantisini ve disk doluluk durumunu kontrol edin."

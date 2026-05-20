@@ -70,19 +70,20 @@ class OllamaClient:
                 except ValueError:
                     continue
 
-    async def generate(
+    def _build_generate_payload(
         self,
         model_tag: str,
         prompt: str,
         *,
-        temperature: float | None = None,
-        context_window: int | None = None,
-        keep_alive: str | int | None = None,
+        stream: bool,
+        temperature: float | None,
+        context_window: int | None,
+        keep_alive: str | int | None,
     ) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "model": model_tag,
             "prompt": prompt,
-            "stream": False,
+            "stream": stream,
         }
         options: dict[str, Any] = {}
         if temperature is not None:
@@ -93,11 +94,75 @@ class OllamaClient:
             payload["options"] = options
         if keep_alive is not None:
             payload["keep_alive"] = keep_alive
+        return payload
 
+    async def generate(
+        self,
+        model_tag: str,
+        prompt: str,
+        *,
+        temperature: float | None = None,
+        context_window: int | None = None,
+        keep_alive: str | int | None = None,
+    ) -> dict[str, Any]:
+        payload = self._build_generate_payload(
+            model_tag, prompt,
+            stream=False,
+            temperature=temperature,
+            context_window=context_window,
+            keep_alive=keep_alive,
+        )
         r = await self._client.post("/api/generate", json=payload)
         if r.status_code >= 400:
             raise OllamaError(f"Ollama generate hatasi {r.status_code}: {r.text[:200]}")
         return r.json()
+
+    async def generate_stream(
+        self,
+        model_tag: str,
+        prompt: str,
+        *,
+        temperature: float | None = None,
+        context_window: int | None = None,
+        keep_alive: str | int | None = None,
+    ) -> AsyncIterator[dict[str, Any]]:
+        import json
+        payload = self._build_generate_payload(
+            model_tag, prompt,
+            stream=True,
+            temperature=temperature,
+            context_window=context_window,
+            keep_alive=keep_alive,
+        )
+        async with self._client.stream(
+            "POST",
+            "/api/generate",
+            json=payload,
+            timeout=httpx.Timeout(connect=5.0, read=None, write=60.0, pool=5.0),
+        ) as resp:
+            if resp.status_code >= 400:
+                body = await resp.aread()
+                raise OllamaError(
+                    f"Ollama generate stream hatasi {resp.status_code}: {body[:200].decode('utf-8', 'replace')}"
+                )
+            async for line in resp.aiter_lines():
+                if not line:
+                    continue
+                try:
+                    yield json.loads(line)
+                except ValueError:
+                    continue
+
+    async def show(self, model_tag: str) -> dict[str, Any] | None:
+        """/api/show — modelin parameter_size, quantization, family vs. bilgileri."""
+        try:
+            r = await self._client.post("/api/show", json={"model": model_tag})
+            if r.status_code >= 400:
+                return None
+            return r.json()
+        except httpx.HTTPError as exc:
+            log.debug("Ollama show cagrisi basarisiz [%s]: %s", model_tag, exc)
+            return None
 
     async def warmup(self, model_tag: str) -> None:
         try:

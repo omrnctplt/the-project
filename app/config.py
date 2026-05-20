@@ -15,6 +15,7 @@ DATA_DIR = Path(os.getenv("DATA_DIR", "/data"))
 CATALOG_PATH = CONFIG_DIR / "model_catalog.yaml"
 DEFAULT_USERS_PATH = CONFIG_DIR / "default_users.yaml"
 RUNTIME_CONFIG_PATH = DATA_DIR / "runtime_config.yaml"
+CATALOG_OVERRIDES_PATH = DATA_DIR / "catalog_overrides.yaml"
 
 VALID_PROFILES = ("auto", "lite", "balanced", "performance")
 
@@ -32,7 +33,55 @@ def _read_yaml(path: Path) -> dict[str, Any]:
 
 
 def load_catalog() -> dict[str, Any]:
-    return _read_yaml(CATALOG_PATH)
+    base = _read_yaml(CATALOG_PATH)
+    overrides = load_catalog_overrides()
+    if overrides:
+        models = dict(base.get("models") or {})
+        for mid, m in (overrides.get("models") or {}).items():
+            models[mid] = m
+        base["models"] = models
+    return base
+
+
+def load_catalog_overrides() -> dict[str, Any]:
+    with _lock:
+        if not CATALOG_OVERRIDES_PATH.exists():
+            return {"models": {}}
+        try:
+            raw = CATALOG_OVERRIDES_PATH.read_text(encoding="utf-8")
+            data = yaml.safe_load(raw) or {}
+        except (OSError, yaml.YAMLError):
+            return {"models": {}}
+        if "models" not in data:
+            data["models"] = {}
+        return data
+
+
+def save_catalog_overrides(data: dict[str, Any]) -> None:
+    with _lock:
+        CATALOG_OVERRIDES_PATH.parent.mkdir(parents=True, exist_ok=True)
+        tmp = CATALOG_OVERRIDES_PATH.with_suffix(".tmp")
+        tmp.write_text(
+            yaml.safe_dump(data, sort_keys=False, allow_unicode=True),
+            encoding="utf-8",
+        )
+        tmp.replace(CATALOG_OVERRIDES_PATH)
+
+
+def add_catalog_override(model_id: str, model: dict[str, Any]) -> dict[str, Any]:
+    data = load_catalog_overrides()
+    data["models"][model_id] = model
+    save_catalog_overrides(data)
+    return data
+
+
+def remove_catalog_override(model_id: str) -> bool:
+    data = load_catalog_overrides()
+    if model_id not in data["models"]:
+        return False
+    del data["models"][model_id]
+    save_catalog_overrides(data)
+    return True
 
 
 def load_default_users() -> dict[str, Any]:

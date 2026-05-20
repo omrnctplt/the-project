@@ -68,6 +68,13 @@ def _verify_password(password: str, password_hash: str) -> bool:
         return False
 
 
+def verify_password(username: str, password: str) -> bool:
+    user = get_user(username)
+    if not user:
+        return False
+    return _verify_password(password, user["password_hash"])
+
+
 def seed_default_users() -> None:
     admin_override = os.getenv("ADMIN_PASSWORD") or ""
     with _lock, _connect() as conn:

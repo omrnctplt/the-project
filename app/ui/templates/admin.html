@@ -39,6 +39,65 @@
 </section>
 
 <section class="card">
+  <h2>Model Katalogu</h2>
+  <p class="muted">Yeni modeller eklemek icin Ollama Library'den (<a href="https://ollama.com/library" target="_blank" rel="noopener">ollama.com/library</a>) tag'i alip asagi yazin. <strong>Pull</strong> dugmesi modeli arka planda indirir, <strong>Inspect</strong> Ollama'dan canli olarak boyut bilgisi cekip ram_gb tahmin eder.</p>
+
+  <form id="catalogForm" class="grid two">
+    <label>Model ID (benzersiz)
+      <input type="text" id="cm_model_id" placeholder="orn: qwen3-4b" />
+    </label>
+    <label>Ollama tag
+      <input type="text" id="cm_ollama_tag" placeholder="orn: qwen3:4b" />
+    </label>
+    <label>Kategori
+      <select id="cm_category">
+        <option value="text">text</option>
+        <option value="code">code</option>
+        <option value="reasoning">reasoning</option>
+        <option value="fallback">fallback</option>
+      </select>
+    </label>
+    <label>Parametre (B)
+      <input type="number" step="0.1" min="0" id="cm_parameters_b" />
+    </label>
+    <label>RAM (GB)
+      <input type="number" step="0.1" min="0.1" id="cm_ram_gb" required />
+    </label>
+    <label>VRAM (GB, opsiyonel)
+      <input type="number" step="0.1" min="0.1" id="cm_vram_gb" />
+    </label>
+    <label class="full">Aciklama (opsiyonel)
+      <input type="text" id="cm_profile" placeholder="orn: Qwen3, hizli ve cok dilli" />
+    </label>
+    <div class="full">
+      <button type="button" id="cm_inspect">Ollama'dan boyut tahmin et</button>
+      <button type="submit" class="primary">Katalog'a ekle ve yeniden planla</button>
+    </div>
+  </form>
+
+  <h3>Aktif katalog</h3>
+  <table id="catalogTable" class="data">
+    <thead><tr><th>Model</th><th>Tag</th><th>Kategori</th><th>RAM/VRAM</th><th>Kaynak</th><th>Eylem</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</section>
+
+<section class="card">
+  <h2>Sifre Degistir</h2>
+  <form id="pwForm" class="grid two">
+    <label>Mevcut sifre
+      <input type="password" id="pw_current" required />
+    </label>
+    <label>Yeni sifre (min 6 karakter)
+      <input type="password" id="pw_new" minlength="6" required />
+    </label>
+    <div class="full">
+      <button type="submit" class="primary">Sifreyi guncelle</button>
+    </div>
+  </form>
+</section>
+
+<section class="card">
   <h2>Kullanicilar</h2>
   <table id="usersTable" class="data">
     <thead><tr><th>Kullanici</th><th>Departman</th><th>Rol</th><th>Etiket</th><th>Son Giris</th></tr></thead>

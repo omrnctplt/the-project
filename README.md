@@ -2,6 +2,27 @@
 
 Kucuk ekipler icin departman bazli, hafif ve acik kaynak bir yerel LLM yonlendirme katmani. Tek `docker compose up` ile gateway, Ollama, Prometheus ve Grafana ayaga kalkar. Sistem ilk acilista donanimi olcer, **uygun kapasite profilini secer**, departman + keyword tabanli akilli yonlendirme yapar ve butun istekleri denetler.
 
+<!-- DEMO_GIF_PLACEHOLDER
+Sunum icin: docs/demo.gif yolunda 10-15 sn'lik bir ekran kaydi koyun
+(login -> dashboard -> streaming chat -> admin panel akisi).
+Sonra alttaki riv satirini yorum disina alin:
+![Demo](docs/demo.gif)
+-->
+
+## Servisler ve Yayin URL'leri
+
+`docker compose up -d` sonrasi tarayicidan asagidaki adreslerle ulasilir (host PC'den):
+
+| Servis | URL | Aciklama |
+|---|---|---|
+| **Gateway UI** | http://localhost:8080 | Login, sohbet, dashboard, admin paneli |
+| **API + OpenAPI** | http://localhost:8080/docs | Swagger UI; tum endpoint'ler |
+| **Grafana** | http://localhost:3000 | Hazir dashboard + alert kurallari (admin/admin) |
+| **Prometheus** | http://localhost:9090 | Ham metrikler ve alert durumu (/alerts) |
+| **Ollama** | http://localhost:11434 | Dogrudan Ollama HTTP API |
+
+Portlar `.env` icinden degistirilebilir (`GATEWAY_PORT`, `OLLAMA_PORT`, `PROM_PORT`, `GRAFANA_PORT`).
+
 > **Bitirme projesi notu:** Bu repository, departmana gore otomatik model secimi, denetlenebilir kullanim kaydi ve dinamik kapasite planlamasi yapan bir kavram kanitidir. Buyuk kurumsal cozumlerle (Run:ai, KServe, Ray Serve) yarisma iddiasinda degildir; 5-50 kisilik ekiplere "her seyin tek bir Docker projesine sigmasi" gozeten bir alternatif sunar.
 
 ---
@@ -127,9 +148,23 @@ Profil her kategoriden **en kucuk** modeli secer. Boyle olunca model katalogunda
 
 ---
 
-## Modeller (Mayis 2026 katalogu)
+## Modeller ve Katalog
 
-`config/model_catalog.yaml` icinde 11 hafif model tanimli (0.5B ile 7B arasi). Aktif/pasif ayrimi profil + donanim profilinizden otomatik yapilir. Yonetim panelinden manuel olarak da listeyi sabitleyebilirsiniz.
+`config/model_catalog.yaml` icinde **temel katalog** tanimli (0.5B ile 7B arasi 11 hafif model). Aktif/pasif ayrimi profil + donanim profilinizden otomatik yapilir.
+
+**Yeni model ekleme (dinamik):**
+1. Ollama Library'den tag'i bulun: https://ollama.com/library — Mayis 2026'da populer olanlar: `qwen3`, `llama3.3`, `gemma3`, `phi4-mini`, `deepseek-r1`, `mistral`, `kimi-k2`.
+2. Admin paneli → "Model Katalogu" bolumu → Ollama tag'ini girin, "Ollama'dan boyut tahmin et" dugmesine basin (sistem `/api/show` ile gercek boyutu cekip RAM tahmin eder).
+3. "Katalog'a ekle ve yeniden planla" → override `data/catalog_overrides.yaml`'a yazilir, sistem replan yapar.
+
+Asagidaki API ile de eklenebilir:
+```bash
+curl -X POST http://localhost:8080/api/v1/system/catalog/models \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"model_id":"qwen3-4b","ollama_tag":"qwen3:4b","category":"text","ram_gb":3.0,"vram_gb":3.0}'
+```
+
+**Tum modeller otomatik mi dusuyor?** Hayir. Ollama Library acik bir registry ama biz default'ta yalniz katalogda **listelenen** modelleri yonetiyoruz. Bunun nedeni: her modelin boyutu, RAM ihtiyaci ve kategorisi bilinmeli ki capacity planner dogru karar versin. Yeni cikan modelleri admin panelden ekleyebilirsiniz — `inspect` ile boyutu otomatik tahmin edilir.
 
 ---
 
@@ -152,7 +187,14 @@ Yonetici hesabi tek bir istek icin spesifik model secebilir (UI: Sohbet sayfasi)
 |---|---|---|
 | POST | `/login` | Kullanici/sifre → JWT |
 | POST | `/api/v1/chat` | Yetkili istek → otomatik secilmis modele yonlendir |
+| POST | `/api/v1/chat/stream` | Streaming yanit (NDJSON, token token) |
+| POST | `/api/v1/me/password` | Kullanicinin kendi sifresini degistirmesi |
 | GET  | `/api/v1/models` | Aktif/pasif modeller ve canli durumlari |
+| GET  | `/api/v1/system/catalog` | Birlesik model katalogu (yaml + override'lar) |
+| POST | `/api/v1/system/catalog/models` | Katalog'a yeni model ekle (admin) |
+| DELETE | `/api/v1/system/catalog/models/{id}` | Override'i sil (admin) |
+| GET  | `/api/v1/system/ollama/local` | Ollama'da yerel olan tum modeller (admin) |
+| POST | `/api/v1/system/ollama/inspect` | Bir tag'in canli boyut/parameter bilgisi (admin) |
 | POST | `/api/v1/system/pull/{model_id}` | Manuel pull tetikle (admin) |
 | GET  | `/api/v1/system/profile` | Donanim + kapasite + runtime config |
 | GET  | `/api/v1/system/profiles` | Tum profil tanimlari |
@@ -167,6 +209,19 @@ Yonetici hesabi tek bir istek icin spesifik model secebilir (UI: Sohbet sayfasi)
 | GET  | `/healthz`, `/readyz` | Saglik kontrolu |
 
 OpenAPI/Swagger dokumantasyonu `/docs` yolundan ulasilabilir.
+
+## Alarmlama
+
+Hazir Prometheus rule'lari (`monitoring/rules/ai-gateway.yml`) ve Grafana provisioned alert'leri (`monitoring/grafana/provisioning/alerting/rules.yaml`) ile birlikte gelir:
+
+- `GatewayDown` — gateway 1 dakikadir scrape edilemiyor
+- `HighErrorRate` — hata orani %5'in uzerinde (2 dk)
+- `HighFallbackRate` — fallback'e dusen istek orani %25'in uzerinde (5 dk)
+- `HighLatencyP95` — bir modelin p95 gecikmesi 30 sn'yi astı (5 dk)
+- `NoActiveModel` — aktif model yok (5 dk)
+- `ModelPullStuck` — pull 15 dakikadir asili kaldi
+
+Grafana'da `AI Gateway` klasoru altinda gorulurler. Prometheus'ta `/alerts` sayfasinda durumlari izlenebilir.
 
 ---
 

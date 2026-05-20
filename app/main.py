@@ -9,18 +9,23 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
+import json as _json
+
 from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from . import audit, auth, capacity as capacity_mod, config as cfg, hwprobe, metrics, usage
 from .models import (
+    CatalogModelRequest,
     ChatRequest,
     ChatResponse,
+    ChatStreamRequest,
     ConfigUpdateRequest,
     LoginRequest,
+    PasswordChangeRequest,
     SystemProfileResponse,
     TokenResponse,
     UsageSummary,
@@ -362,6 +367,212 @@ async def chat(
         )
     finally:
         metrics.INFLIGHT.dec()
+
+
+@app.post("/api/v1/chat/stream")
+async def chat_stream(
+    body: ChatStreamRequest,
+    request: Request,
+    principal: dict[str, Any] = Depends(auth.current_principal),
+) -> StreamingResponse:
+    state = _state(request)
+    if not state.ready or not state.router or not state.orchestrator:
+        raise HTTPException(status_code=503, detail="Gateway henuz hazir degil")
+
+    department = principal["department"]
+    username = principal["username"]
+    rate_limit = _resolve_rate_limit(state.catalog, department)
+    allowed, _count = usage.check_and_record_rate(
+        key=f"user:{username}", limit_per_min=rate_limit
+    )
+    if not allowed:
+        metrics.RATE_LIMITED.labels(department=department).inc()
+        raise HTTPException(
+            status_code=429,
+            detail=f"Departman/kullanici dakika basina {rate_limit} istek limitini asti",
+        )
+
+    if body.model_id and principal["role"] == "admin":
+        override = state.orchestrator.get_state(body.model_id)
+        if not override:
+            raise HTTPException(status_code=400, detail=f"Model bulunamadi: {body.model_id}")
+        decision_model = body.model_id
+        category = override.category
+        matched_rule = "admin_override"
+        fallback = False
+        fallback_reason: str | None = None
+    else:
+        try:
+            decision = state.router.decide(department, body.prompt)
+        except RuntimeError as exc:
+            raise HTTPException(
+                status_code=503,
+                detail=f"Henuz hazir model yok: {exc}.",
+            ) from exc
+        decision_model = decision.model_id
+        category = decision.category
+        matched_rule = decision.matched_rule
+        fallback = decision.fallback_triggered
+        fallback_reason = decision.fallback_reason
+        if fallback:
+            metrics.FALLBACKS.labels(department=department).inc()
+
+    async def event_source():
+        metrics.INFLIGHT.inc()
+        header = {
+            "event": "start",
+            "model_id": decision_model,
+            "category": category,
+            "matched_rule": matched_rule,
+            "fallback_triggered": fallback,
+            "fallback_reason": fallback_reason,
+        }
+        yield _json.dumps(header, ensure_ascii=False) + "\n"
+        total_eval = 0
+        total_prompt_eval = 0
+        latency_ms = 0.0
+        status = "ok"
+        try:
+            with metrics.LATENCY.labels(model=decision_model, category=category).time():
+                async for event in state.orchestrator.call_stream(  # type: ignore[union-attr]
+                    decision_model,
+                    body.prompt,
+                    temperature=body.temperature,
+                    context_window=state.catalog.get("defaults", {}).get("context_window"),
+                ):
+                    if event.get("eval_count"):
+                        total_eval = int(event["eval_count"])
+                    if event.get("prompt_eval_count"):
+                        total_prompt_eval = int(event["prompt_eval_count"])
+                    out = {
+                        "event": "token",
+                        "response": event.get("response", ""),
+                        "done": bool(event.get("done", False)),
+                    }
+                    if event.get("done"):
+                        out["eval_count"] = total_eval
+                        out["prompt_eval_count"] = total_prompt_eval
+                    yield _json.dumps(out, ensure_ascii=False) + "\n"
+            metrics.REQUESTS.labels(
+                model=decision_model, category=category,
+                department=department, status="ok",
+            ).inc()
+            metrics.TOKENS_OUT.labels(model=decision_model).inc(total_eval)
+        except Exception as exc:
+            status = "error"
+            metrics.REQUESTS.labels(
+                model=decision_model, category=category,
+                department=department, status="error",
+            ).inc()
+            err = {"event": "error", "detail": str(exc)}
+            yield _json.dumps(err, ensure_ascii=False) + "\n"
+        finally:
+            metrics.INFLIGHT.dec()
+            usage.record(
+                username=username, model_id=decision_model,
+                tokens_in=total_prompt_eval, tokens_out=total_eval,
+                latency_ms=latency_ms,
+            )
+            audit.write(
+                username=username, department=department, prompt=body.prompt,
+                model_id=decision_model, category=category, matched_rule=matched_rule,
+                fallback=fallback, status=status, latency_ms=latency_ms,
+                tokens_in=total_prompt_eval, tokens_out=total_eval,
+            )
+
+    return StreamingResponse(event_source(), media_type="application/x-ndjson")
+
+
+@app.post("/api/v1/me/password")
+async def me_change_password(
+    body: PasswordChangeRequest,
+    principal: dict[str, Any] = Depends(auth.current_principal),
+) -> dict[str, str]:
+    username = principal["username"]
+    if not auth.verify_password(username, body.current_password):
+        raise HTTPException(status_code=401, detail="Mevcut sifre hatali")
+    if body.current_password == body.new_password:
+        raise HTTPException(status_code=400, detail="Yeni sifre eskisinden farkli olmali")
+    ok = auth.change_password(username, body.new_password)
+    if not ok:
+        raise HTTPException(status_code=500, detail="Sifre guncellenemedi")
+    return {"status": "ok"}
+
+
+@app.get("/api/v1/system/catalog")
+async def get_catalog(request: Request, _=Depends(auth.current_principal)) -> dict[str, Any]:
+    state = _state(request)
+    overrides = cfg.load_catalog_overrides().get("models") or {}
+    return {
+        "models": state.catalog.get("models", {}),
+        "departments": state.catalog.get("departments", {}),
+        "overridden": list(overrides.keys()),
+    }
+
+
+@app.post("/api/v1/system/catalog/models")
+async def add_catalog_model(
+    body: CatalogModelRequest,
+    request: Request,
+    _=Depends(auth.require_admin),
+) -> dict[str, Any]:
+    state = _state(request)
+    payload = body.model_dump(exclude_none=True)
+    model_id = payload.pop("model_id")
+    cfg.add_catalog_override(model_id, payload)
+    state.catalog = cfg.load_catalog()
+    return await _replan(request)
+
+
+@app.delete("/api/v1/system/catalog/models/{model_id}")
+async def delete_catalog_model(
+    model_id: str,
+    request: Request,
+    _=Depends(auth.require_admin),
+) -> dict[str, Any]:
+    state = _state(request)
+    if not cfg.remove_catalog_override(model_id):
+        raise HTTPException(status_code=404, detail="Override bulunamadi (orijinal katalog dosyasi degistirilemez)")
+    state.catalog = cfg.load_catalog()
+    return await _replan(request)
+
+
+@app.get("/api/v1/system/ollama/local")
+async def ollama_local(request: Request, _=Depends(auth.require_admin)) -> dict[str, Any]:
+    state = _state(request)
+    if not state.orchestrator:
+        return {"models": []}
+    try:
+        local = await state.orchestrator.client.list_local()
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Ollama'ya ulasilamadi: {exc}") from exc
+    return {"models": local}
+
+
+@app.post("/api/v1/system/ollama/inspect")
+async def ollama_inspect(
+    body: dict[str, str],
+    request: Request,
+    _=Depends(auth.require_admin),
+) -> dict[str, Any]:
+    state = _state(request)
+    tag = body.get("ollama_tag")
+    if not tag:
+        raise HTTPException(status_code=400, detail="ollama_tag zorunlu")
+    if not state.orchestrator:
+        raise HTTPException(status_code=503, detail="Orchestrator hazir degil")
+    info = await state.orchestrator.client.show(tag)
+    if info is None:
+        raise HTTPException(status_code=404, detail=f"Ollama '{tag}' tagini taniyamadi (pull edilmis olmasi gerek)")
+    details = info.get("details") or {}
+    size_bytes = float(info.get("size") or 0)
+    return {
+        "ollama_tag": tag,
+        "parameter_size": details.get("parameter_size"),
+        "quantization_level": details.get("quantization_level"),
+        "family": details.get("family"),
+        "estimated_ram_gb": round(size_bytes / 1024**3 * 1.1, 2) if size_bytes else None,
+    }
 
 
 @app.get("/api/v1/models")

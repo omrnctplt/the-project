@@ -1,0 +1,137 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: ai-gateway
+    folder: AI Gateway
+    interval: 30s
+    rules:
+      - uid: gw-error-rate
+        title: Hata orani %5'in uzerinde
+        condition: cond
+        data:
+          - refId: query
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: onprem-prom
+            model:
+              editorMode: code
+              expr: |
+                sum(rate(ai_gateway_requests_total{status="error"}[5m]))
+                /
+                clamp_min(sum(rate(ai_gateway_requests_total[5m])), 1e-9)
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: query
+          - refId: cond
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params: [0.05]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [query]
+                  reducer:
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: query
+              refId: cond
+              type: threshold
+        for: 2m
+        labels:
+          severity: warning
+          component: gateway
+        annotations:
+          summary: "Gateway hata orani son 5 dakikada %5'in uzerinde."
+          description: "Hata orani: {{ $value | humanizePercentage }}. Loglari kontrol edin: docker compose logs gateway"
+        noDataState: OK
+        execErrState: Alerting
+
+      - uid: gw-no-active-model
+        title: Aktif model yok
+        condition: cond
+        data:
+          - refId: query
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: onprem-prom
+            model:
+              editorMode: code
+              expr: ai_gateway_active_models
+              instant: true
+              refId: query
+          - refId: cond
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params: [1]
+                    type: lt
+                  query:
+                    params: [query]
+                  reducer:
+                    type: last
+                  type: query
+              expression: query
+              refId: cond
+              type: threshold
+        for: 5m
+        labels:
+          severity: critical
+          component: capacity
+        annotations:
+          summary: "Hicbir model aktif degil."
+          description: "Profili 'lite'a almayi veya HOST_RAM_GB degerini gozden gecirmeyi deneyin."
+        noDataState: OK
+        execErrState: Alerting
+
+      - uid: gw-high-fallback
+        title: Fallback orani %25'in uzerinde
+        condition: cond
+        data:
+          - refId: query
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: onprem-prom
+            model:
+              editorMode: code
+              expr: |
+                sum(rate(ai_gateway_fallback_total[5m]))
+                /
+                clamp_min(sum(rate(ai_gateway_requests_total[5m])), 1e-9)
+              instant: true
+              refId: query
+          - refId: cond
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params: [0.25]
+                    type: gt
+                  query:
+                    params: [query]
+                  reducer:
+                    type: last
+                  type: query
+              expression: query
+              refId: cond
+              type: threshold
+        for: 5m
+        labels:
+          severity: warning
+          component: router
+        annotations:
+          summary: "Routing fallback'e cok dusuyor ({{ $value | humanizePercentage }})."
+          description: "Departmanlarin primary_category'sindeki modeller hazir olmayabilir. /api/v1/models'i kontrol edin."
+        noDataState: OK
+        execErrState: Alerting

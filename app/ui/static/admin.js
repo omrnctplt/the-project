@@ -64,6 +64,98 @@
     }
   } catch (e) { console.error(e); }
 
+  // ---- Katalog yonetimi ----
+  async function refreshCatalog() {
+    try {
+      const c = await api("/api/v1/system/catalog");
+      const overridden = new Set(c.overridden || []);
+      const tb = document.querySelector("#catalogTable tbody");
+      tb.innerHTML = "";
+      for (const [mid, m] of Object.entries(c.models || {})) {
+        const isOverride = overridden.has(mid);
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${mid}</td>
+          <td><code>${m.ollama_tag}</code></td>
+          <td>${m.category}</td>
+          <td>${m.ram_gb || "?"} / ${m.vram_gb || "?"} GB</td>
+          <td>${isOverride ? '<span class="badge warn">override</span>' : '<span class="badge">yaml</span>'}</td>
+          <td>
+            <button data-pull="${mid}" class="small">pull</button>
+            ${isOverride ? `<button data-del="${mid}" class="small">sil</button>` : ""}
+          </td>`;
+        tb.appendChild(tr);
+      }
+      tb.querySelectorAll("button[data-pull]").forEach((b) => {
+        b.addEventListener("click", async () => {
+          try {
+            await api(`/api/v1/system/pull/${encodeURIComponent(b.dataset.pull)}`, { method: "POST" });
+            alert(`Pull baslatildi: ${b.dataset.pull}`);
+          } catch (e) { alert("Hata: " + e.message); }
+        });
+      });
+      tb.querySelectorAll("button[data-del]").forEach((b) => {
+        b.addEventListener("click", async () => {
+          if (!confirm(`'${b.dataset.del}' override'i silinsin mi?`)) return;
+          try {
+            await api(`/api/v1/system/catalog/models/${encodeURIComponent(b.dataset.del)}`, { method: "DELETE" });
+            refreshCatalog();
+          } catch (e) { alert("Hata: " + e.message); }
+        });
+      });
+    } catch (e) { console.error(e); }
+  }
+  refreshCatalog();
+
+  document.getElementById("cm_inspect").addEventListener("click", async () => {
+    const tag = document.getElementById("cm_ollama_tag").value.trim();
+    if (!tag) { alert("Once Ollama tag girin."); return; }
+    try {
+      const r = await api("/api/v1/system/ollama/inspect", { method: "POST", body: JSON.stringify({ ollama_tag: tag }) });
+      if (r.estimated_ram_gb) document.getElementById("cm_ram_gb").value = r.estimated_ram_gb;
+      if (r.parameter_size) {
+        const num = parseFloat(String(r.parameter_size).replace(/[^0-9.]/g, ""));
+        if (!isNaN(num)) document.getElementById("cm_parameters_b").value = num;
+      }
+      alert(`Bulundu: ${r.parameter_size || "?"} param, ~${r.estimated_ram_gb || "?"} GB RAM (tahmin).`);
+    } catch (e) { alert("Inspect basarisiz: " + e.message + " (Modelin Ollama'da pull edilmis olmasi gerekir.)"); }
+  });
+
+  document.getElementById("catalogForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const body = {
+      model_id: document.getElementById("cm_model_id").value.trim(),
+      ollama_tag: document.getElementById("cm_ollama_tag").value.trim(),
+      category: document.getElementById("cm_category").value,
+      ram_gb: parseFloat(document.getElementById("cm_ram_gb").value),
+    };
+    const pb = parseFloat(document.getElementById("cm_parameters_b").value);
+    const vr = parseFloat(document.getElementById("cm_vram_gb").value);
+    const prof = document.getElementById("cm_profile").value.trim();
+    if (!isNaN(pb)) body.parameters_b = pb;
+    if (!isNaN(vr)) body.vram_gb = vr;
+    if (prof) body.profile = prof;
+    try {
+      await api("/api/v1/system/catalog/models", { method: "POST", body: JSON.stringify(body) });
+      refreshCatalog();
+      alert("Katalog'a eklendi, plan yenilendi.");
+    } catch (err) { alert("Eklenemedi: " + err.message); }
+  });
+
+  // ---- Sifre degistir ----
+  document.getElementById("pwForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const body = {
+      current_password: document.getElementById("pw_current").value,
+      new_password: document.getElementById("pw_new").value,
+    };
+    try {
+      await api("/api/v1/me/password", { method: "POST", body: JSON.stringify(body) });
+      alert("Sifre guncellendi. Tekrar giris yapmaniz gerekebilir.");
+      document.getElementById("pwForm").reset();
+    } catch (err) { alert("Sifre degistirilemedi: " + err.message); }
+  });
+
   try {
     const a = await api("/api/v1/audit?limit=100");
     const tb = document.querySelector("#auditTable tbody");

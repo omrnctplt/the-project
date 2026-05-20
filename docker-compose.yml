@@ -90,6 +90,7 @@ services:
       - "--web.enable-lifecycle"
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/rules:/etc/prometheus/rules:ro
       - prom_data:/prometheus
     ports:
       - "${PROM_PORT:-9090}:9090"

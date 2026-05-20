@@ -43,6 +43,27 @@ class ChatResponse(_Base):
     prompt_eval_count: int | None = None
 
 
+class PasswordChangeRequest(_Base):
+    current_password: str = Field(..., min_length=1, max_length=256)
+    new_password: str = Field(..., min_length=6, max_length=256)
+
+
+class ChatStreamRequest(_Base):
+    prompt: str = Field(..., min_length=1, max_length=8192)
+    temperature: float | None = Field(default=None, ge=0.0, le=2.0)
+    model_id: str | None = None
+
+
+class CatalogModelRequest(_Base):
+    model_id: str = Field(..., min_length=1, max_length=64, pattern=r"^[a-zA-Z0-9._\-]+$")
+    ollama_tag: str = Field(..., min_length=1, max_length=128)
+    category: str = Field(..., pattern="^(text|code|reasoning|fallback)$")
+    parameters_b: float | None = Field(default=None, ge=0.0, le=1000.0)
+    ram_gb: float = Field(..., gt=0.0, le=512.0)
+    vram_gb: float | None = Field(default=None, gt=0.0, le=512.0)
+    profile: str | None = Field(default=None, max_length=256)
+
+
 class ConfigUpdateRequest(_Base):
     profile: str | None = Field(default=None, pattern="^(auto|lite|balanced|performance)$")
     expected_users: int | None = Field(default=None, ge=1, le=1000)
