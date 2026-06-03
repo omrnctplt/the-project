@@ -72,6 +72,7 @@ class ConfigUpdateRequest(_Base):
     manual_override: bool | None = None
     auto_pull: bool | None = None
     idle_unload_minutes: int | None = Field(default=None, ge=1, le=1440)
+    category_assignments: dict[str, list[str]] | None = None
 
 
 class SystemProfileResponse(_Base):

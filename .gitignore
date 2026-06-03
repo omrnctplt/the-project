@@ -16,6 +16,7 @@ venv/
 htmlcov/
 .idea/
 .vscode/
+.claude/
 *.log
 *.sqlite
 *.sqlite3

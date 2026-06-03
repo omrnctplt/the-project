@@ -171,6 +171,19 @@ class Orchestrator:
                 log.error("Pull hatasi [%s]: %s", state.ollama_tag, exc)
                 raise
 
+    async def delete_model(self, model_id: str) -> bool:
+        """Modeli Ollama'dan siler ve state'i 'indirilmemis' olarak gunceller."""
+        state = self._states.get(model_id)
+        if not state:
+            return False
+        ok = await self.client.delete(state.ollama_tag)
+        if ok:
+            state.pulled = False
+            state.last_pull_progress = 0.0
+            state.status = "passive" if model_id in self.passive_model_ids else "unknown"
+            log.info("Model Ollama'dan silindi: %s", state.ollama_tag)
+        return ok
+
     async def pull_initial(self) -> None:
         """Bootstrap'ta sadece en kucuk 1 modeli (genelde fallback) indir.
 

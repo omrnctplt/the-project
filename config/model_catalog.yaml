@@ -1,270 +1,90 @@
-# Mayis 2026 itibariyla guncel hafif modeller — hepsi Ollama Library'de mevcut.
-# Yeni model eklemek isterseniz vram_gb / ram_gb degerlerini dogru girin;
-# capacity planlayicisi donanim profiline gore otomatik aktif/pasif isaretler.
+# =============================================================
+# On-Premise AI Gateway — Model Havuzu (Haziran 2026)
+# =============================================================
+# Donanima gore tier'lanmis guncel acik kaynak model havuzu.
+#
+#   tier   : edge (<=4 GB) | laptop (4-16 GB) | workstation (16-48 GB) | datacenter (48 GB+)
+#   source : ollama | huggingface   (huggingface => ollama "hf.co/..." tag'i ile cekilir)
+#   ram_gb / vram_gb : Q4_K_M kuantizasyon icin yaklasik bellek ihtiyaci
+#
+# Capacity planlayicisi bu havuzu donanim profiline gore otomatik
+# aktif/pasif isaretler; admin "Modeller" sayfasindan tek tikla pull/sil yapar.
 
 defaults:
   context_window: 4096
   temperature: 0.6
-  warmup_on_start: false      # true ise compose up sonrasi modeller hemen yuklenir
+  warmup_on_start: false
 
 categories:
   text:
-    description: "Metin, sozel, ozet, e-posta, sozlesme analizi"
+    description: "Genel metin, ozet, e-posta, sohbet"
   code:
-    description: "Kod yazma, refactor, code review"
+    description: "Kod yazma, refactor, code review, hata ayiklama"
   reasoning:
-    description: "Akil yurutme, matematik, multi-step problem"
+    description: "Akil yurutme, matematik, cok adimli problem cozme"
+  persona:
+    description: "Rol yapma, karakter/persona, yaratici diyalog"
   fallback:
-    description: "Diger modeller mesgulken hizli ve hafif yanit"
+    description: "Diger modeller mesgulken hizli, hafif yanit"
 
 models:
-  # --------- Metin / sozel ---------
-  llama3.2-1b:
-    ollama_tag: "llama3.2:1b"
-    category: text
-    parameters_b: 1.2
-    ram_gb: 1.5
-    vram_gb: 1.5
-    profile: "Hizli, hafif metin yaniti. Meta Llama 3.2."
+  # ==================== EDGE (<= 4 GB) ====================
+  qwen3-0.6b: {ollama_tag: "qwen3:0.6b", category: fallback, parameters_b: 0.6, ram_gb: 0.7, vram_gb: 0.7, tier: edge, source: ollama, license: "Apache 2.0", profile: "Qwen3 ultra-hafif yedek, cok dilli."}
+  smollm2-360m: {ollama_tag: "smollm2:360m", category: fallback, parameters_b: 0.36, ram_gb: 0.4, vram_gb: 0.4, tier: edge, source: ollama, license: "Apache 2.0", profile: "HuggingFace SmolLM2 — en hafif yedek, edge cihazlar."}
+  qwen2.5-0.5b: {ollama_tag: "qwen2.5:0.5b", category: fallback, parameters_b: 0.5, ram_gb: 0.5, vram_gb: 0.5, tier: edge, source: ollama, license: "Apache 2.0", profile: "Cok hafif yedek, neredeyse her zaman hazir."}
+  gemma3-1b: {ollama_tag: "gemma3:1b", category: text, parameters_b: 1.0, ram_gb: 1.0, vram_gb: 1.0, tier: edge, source: ollama, license: "Gemma", profile: "Google Gemma 3 — kucuk, hizli, multilingual."}
+  llama3.2-1b: {ollama_tag: "llama3.2:1b", category: text, parameters_b: 1.2, ram_gb: 1.3, vram_gb: 1.3, tier: edge, source: ollama, license: "Llama 3.2", profile: "Meta Llama 3.2 — Arm optimize, hizli metin."}
+  qwen3-1.7b: {ollama_tag: "qwen3:1.7b", category: text, parameters_b: 1.7, ram_gb: 1.4, vram_gb: 1.4, tier: edge, source: ollama, license: "Apache 2.0", profile: "Qwen3 — Turkce dahil cok dilli, hizli."}
+  llama3.2-3b: {ollama_tag: "llama3.2:3b", category: text, parameters_b: 3.2, ram_gb: 2.5, vram_gb: 2.5, tier: edge, source: ollama, license: "Llama 3.2", profile: "Dengeli metin/ozet — edge icin ideal."}
+  smollm3-3b: {ollama_tag: "smollm3:3b", category: text, parameters_b: 3.0, ram_gb: 2.5, vram_gb: 2.5, tier: edge, source: ollama, license: "Apache 2.0", profile: "SmolLM3 — Llama 3.2 3B ve Qwen2.5 3B'yi geciyor."}
+  qwen3-4b: {ollama_tag: "qwen3:4b", category: text, parameters_b: 4.0, ram_gb: 3.0, vram_gb: 3.0, tier: edge, source: ollama, license: "Apache 2.0", profile: "Qwen3 orta-kucuk — gunluk genel kullanim."}
+  gemma3-4b: {ollama_tag: "gemma3:4b", category: text, parameters_b: 4.0, ram_gb: 3.3, vram_gb: 3.3, tier: edge, source: ollama, license: "Gemma", profile: "Gemma 3 — vision + tool calling destekli."}
+  gemma3n-e2b: {ollama_tag: "gemma3n:e2b", category: text, parameters_b: 2.0, ram_gb: 2.0, vram_gb: 2.0, tier: edge, source: ollama, license: "Gemma", profile: "Gemma 3n — multimodal (metin/gorsel/ses), cihaz-ici."}
+  qwen2.5-coder-3b: {ollama_tag: "qwen2.5-coder:3b", category: code, parameters_b: 3.1, ram_gb: 2.5, vram_gb: 2.5, tier: edge, source: ollama, license: "Apache 2.0", profile: "Hizli kod tamamlama, snippet."}
+  deepseek-r1-1.5b: {ollama_tag: "deepseek-r1:1.5b", category: reasoning, parameters_b: 1.5, ram_gb: 1.5, vram_gb: 1.5, tier: edge, source: ollama, license: "MIT", profile: "DeepSeek-R1 distill — hafif reasoning."}
 
-  llama3.2-3b:
-    ollama_tag: "llama3.2:3b"
-    category: text
-    parameters_b: 3.2
-    ram_gb: 2.5
-    vram_gb: 2.5
-    profile: "Daha kapasiteli metin, ozet, sozlesme."
+  # ==================== LAPTOP (4-16 GB) ====================
+  mistral-7b: {ollama_tag: "mistral:7b", category: text, parameters_b: 7.2, ram_gb: 4.8, vram_gb: 4.8, tier: laptop, source: ollama, license: "Apache 2.0", profile: "Mistral 7B — klasik dengeli, multilingual."}
+  llama3.1-8b: {ollama_tag: "llama3.1:8b", category: text, parameters_b: 8.0, ram_gb: 6.0, vram_gb: 6.0, tier: laptop, source: ollama, license: "Llama 3.1", profile: "Llama 3.1 8B — guclu genel amac, 128K context."}
+  qwen3-8b: {ollama_tag: "qwen3:8b", category: text, parameters_b: 8.0, ram_gb: 5.5, vram_gb: 5.5, tier: laptop, source: ollama, license: "Apache 2.0", profile: "Qwen3 8B — guclu cok dilli, tool use."}
+  granite3.3-8b: {ollama_tag: "granite3.3:8b", category: text, parameters_b: 8.2, ram_gb: 5.5, vram_gb: 5.5, tier: laptop, source: ollama, license: "Apache 2.0", profile: "IBM Granite 3.3 — enterprise, tool calling."}
+  gemma3-12b: {ollama_tag: "gemma3:12b", category: text, parameters_b: 12.0, ram_gb: 8.0, vram_gb: 8.0, tier: laptop, source: ollama, license: "Gemma", profile: "Gemma 3 12B — dengeli kalite, vision."}
+  qwen3-14b: {ollama_tag: "qwen3:14b", category: text, parameters_b: 14.0, ram_gb: 10.0, vram_gb: 10.0, tier: laptop, source: ollama, license: "Apache 2.0", profile: "Qwen3 14B — yuksek kaliteli genel amac."}
+  phi4-14b: {ollama_tag: "phi4:14b", category: reasoning, parameters_b: 14.0, ram_gb: 10.0, vram_gb: 10.0, tier: laptop, source: ollama, license: "MIT", profile: "Microsoft Phi-4 — dense reasoning + STEM."}
+  deepseek-r1-7b: {ollama_tag: "deepseek-r1:7b", category: reasoning, parameters_b: 7.0, ram_gb: 5.0, vram_gb: 5.0, tier: laptop, source: ollama, license: "MIT", profile: "DeepSeek-R1 7B — multi-step reasoning."}
+  deepseek-r1-14b: {ollama_tag: "deepseek-r1:14b", category: reasoning, parameters_b: 14.0, ram_gb: 10.0, vram_gb: 10.0, tier: laptop, source: ollama, license: "MIT", profile: "DeepSeek-R1 14B — daha derin reasoning."}
+  qwen2.5-coder-7b: {ollama_tag: "qwen2.5-coder:7b", category: code, parameters_b: 7.6, ram_gb: 5.0, vram_gb: 5.0, tier: laptop, source: ollama, license: "Apache 2.0", profile: "Tam coding asistani — refactor, review."}
+  qwen2.5-coder-14b: {ollama_tag: "qwen2.5-coder:14b", category: code, parameters_b: 14.0, ram_gb: 10.0, vram_gb: 10.0, tier: laptop, source: ollama, license: "Apache 2.0", profile: "Agir coding, refactor, buyuk context."}
+  gpt-oss-20b: {ollama_tag: "gpt-oss:20b", category: reasoning, parameters_b: 20.0, ram_gb: 14.0, vram_gb: 14.0, tier: laptop, source: ollama, license: "Apache 2.0", profile: "OpenAI gpt-oss 20B — ayarlanabilir reasoning (~o3-mini)."}
+  dolphin3-8b: {ollama_tag: "dolphin3:8b", category: persona, parameters_b: 8.0, ram_gb: 5.5, vram_gb: 5.5, tier: laptop, source: ollama, license: "Llama 3.1", profile: "Dolphin 3 — yonlendirilebilir persona / rol yapma."}
+  hermes3-8b: {ollama_tag: "hermes3:8b", category: persona, parameters_b: 8.0, ram_gb: 5.5, vram_gb: 5.5, tier: laptop, source: ollama, license: "Llama 3.1", profile: "Nous Hermes 3 — uzun diyalog, karakter tutarliligi."}
 
-  qwen2.5-1.5b:
-    ollama_tag: "qwen2.5:1.5b"
-    category: text
-    parameters_b: 1.5
-    ram_gb: 1.2
-    vram_gb: 1.2
-    profile: "Cok dilli, Turkce'de iyi, hizli."
+  # ==================== WORKSTATION (16-48 GB) ====================
+  qwen3-30b-a3b: {ollama_tag: "qwen3:30b", category: text, parameters_b: 30.0, ram_gb: 20.0, vram_gb: 20.0, tier: workstation, source: ollama, license: "Apache 2.0", profile: "Qwen3 30B-A3B (MoE) — dengeli, verimli."}
+  qwen3-32b: {ollama_tag: "qwen3:32b", category: text, parameters_b: 32.8, ram_gb: 22.0, vram_gb: 22.0, tier: workstation, source: ollama, license: "Apache 2.0", profile: "Qwen3 32B dense — yuksek kalite genel amac."}
+  gemma3-27b: {ollama_tag: "gemma3:27b", category: text, parameters_b: 27.0, ram_gb: 18.0, vram_gb: 18.0, tier: workstation, source: ollama, license: "Gemma", profile: "Gemma 3 27B — frontier yakini, vision."}
+  qwen2.5-coder-32b: {ollama_tag: "qwen2.5-coder:32b", category: code, parameters_b: 32.0, ram_gb: 22.0, vram_gb: 22.0, tier: workstation, source: ollama, license: "Apache 2.0", profile: "Qwen2.5 Coder 32B — en guclu yerel coding."}
+  deepseek-r1-32b: {ollama_tag: "deepseek-r1:32b", category: reasoning, parameters_b: 32.0, ram_gb: 22.0, vram_gb: 22.0, tier: workstation, source: ollama, license: "MIT", profile: "DeepSeek-R1 32B — guclu matematik/reasoning."}
+  mixtral-8x7b: {ollama_tag: "mixtral:8x7b", category: text, parameters_b: 47.0, ram_gb: 26.0, vram_gb: 26.0, tier: workstation, source: ollama, license: "Apache 2.0", profile: "Mistral Mixtral 8x7B (MoE) — verimli buyuk model."}
+  llama3.3-70b: {ollama_tag: "llama3.3:70b", category: text, parameters_b: 70.0, ram_gb: 43.0, vram_gb: 43.0, tier: workstation, source: ollama, license: "Llama 3.3", profile: "Llama 3.3 70B — 405B kalitesi, agir donanim."}
+  dolphin-mixtral-8x7b: {ollama_tag: "dolphin-mixtral:8x7b", category: persona, parameters_b: 47.0, ram_gb: 26.0, vram_gb: 26.0, tier: workstation, source: ollama, license: "Apache 2.0", profile: "Dolphin Mixtral — guclu persona / yaratici diyalog."}
 
-  qwen2.5-3b:
-    ollama_tag: "qwen2.5:3b"
-    category: text
-    parameters_b: 3.0
-    ram_gb: 2.4
-    vram_gb: 2.4
-    profile: "Genel amacli, Turkce, makul kalite."
-
-  gemma2-2b:
-    ollama_tag: "gemma2:2b"
-    category: text
-    parameters_b: 2.6
-    ram_gb: 2.0
-    vram_gb: 2.0
-    profile: "Google Gemma 2 — dengeli metin modeli."
-
-  # --------- Yeni nesil (Mayis 2026) ---------
-  gemma4-e2b:
-    ollama_tag: "gemma4:e2b"
-    category: text
-    parameters_b: 2.3
-    ram_gb: 1.8
-    vram_gb: 1.8
-    profile: "Google Gemma 4 E2B — multimodal, 256K context, Nisan 2026."
-
-  gemma4-e4b:
-    ollama_tag: "gemma4:e4b"
-    category: text
-    parameters_b: 4.5
-    ram_gb: 3.2
-    vram_gb: 3.2
-    profile: "Google Gemma 4 E4B — multimodal, dengeli, Nisan 2026."
-
-  gemma3-1b:
-    ollama_tag: "gemma3:1b"
-    category: text
-    parameters_b: 1.0
-    ram_gb: 1.0
-    vram_gb: 1.0
-    profile: "Google Gemma 3 — kucuk, hizli, multilingual."
-
-  gemma3-4b:
-    ollama_tag: "gemma3:4b"
-    category: text
-    parameters_b: 4.0
-    ram_gb: 3.0
-    vram_gb: 3.0
-    profile: "Google Gemma 3 — dengeli metin, vision + tool calling destekli."
-
-  qwen3-0.6b:
-    ollama_tag: "qwen3:0.6b"
-    category: fallback
-    parameters_b: 0.6
-    ram_gb: 0.7
-    vram_gb: 0.7
-    profile: "Qwen3 en kucuk — ultra hafif yedek model."
-
-  qwen3-1.7b:
-    ollama_tag: "qwen3:1.7b"
-    category: text
-    parameters_b: 1.7
-    ram_gb: 1.5
-    vram_gb: 1.5
-    profile: "Qwen3 — Turkce dahil cok dilli, hizli yeni nesil."
-
-  qwen3-4b:
-    ollama_tag: "qwen3:4b"
-    category: text
-    parameters_b: 4.0
-    ram_gb: 3.0
-    vram_gb: 3.0
-    profile: "Qwen3 — orta boy metin, yeni nesil."
-
-  qwen3-8b:
-    ollama_tag: "qwen3:8b"
-    category: text
-    parameters_b: 8.0
-    ram_gb: 5.5
-    vram_gb: 5.5
-    profile: "Qwen3 — buyuk metin/genel amac, yeni nesil."
-
-  phi4-mini:
-    ollama_tag: "phi4-mini"
-    category: reasoning
-    parameters_b: 3.8
-    ram_gb: 2.8
-    vram_gb: 2.8
-    profile: "Microsoft Phi-4 mini — STEM/reasoning, parametre basina yogun bilgi."
-
-  phi4-14b:
-    ollama_tag: "phi4:14b"
-    category: reasoning
-    parameters_b: 14.0
-    ram_gb: 9.0
-    vram_gb: 9.0
-    profile: "Microsoft Phi-4 14B — dense reasoning + STEM."
-
-  mistral-7b:
-    ollama_tag: "mistral:7b"
-    category: text
-    parameters_b: 7.2
-    ram_gb: 4.8
-    vram_gb: 4.8
-    profile: "Mistral 7B — klasik dengeli, multilingual."
-
-  mistral-small-3.2:
-    ollama_tag: "mistral-small3.2"
-    category: text
-    parameters_b: 24.0
-    ram_gb: 16.0
-    vram_gb: 16.0
-    profile: "Mistral Small 3.2 — 24B dense, production-grade multilingual."
-
-  llama3.3-70b:
-    ollama_tag: "llama3.3:70b-instruct-q4_K_M"
-    category: text
-    parameters_b: 70.0
-    ram_gb: 42.0
-    vram_gb: 42.0
-    profile: "Meta Llama 3.3 70B — frontier kalite, agir donanim gerek."
-
-  deepseek-v3-pruned-coder:
-    ollama_tag: "deepseek-v3:411b-pruned-coder"
-    category: code
-    parameters_b: 411.0
-    ram_gb: 240.0
-    vram_gb: 240.0
-    profile: "DeepSeek V3 411B pruned coder — datacenter-grade, lab kullanimi."
-
-  deepseek-r1-14b:
-    ollama_tag: "deepseek-r1:14b"
-    category: reasoning
-    parameters_b: 14.0
-    ram_gb: 9.0
-    vram_gb: 9.0
-    profile: "DeepSeek R1 14B distill — reasoning, orta donanim."
-
-  qwen2.5-coder-14b:
-    ollama_tag: "qwen2.5-coder:14b"
-    category: code
-    parameters_b: 14.0
-    ram_gb: 9.0
-    vram_gb: 9.0
-    profile: "Qwen2.5 Coder 14B — agir coding, refactor, big-context."
-
-  smollm2-360m:
-    ollama_tag: "smollm2:360m"
-    category: fallback
-    parameters_b: 0.36
-    ram_gb: 0.4
-    vram_gb: 0.4
-    profile: "HF SmolLM2 — cok hafif, edge cihazlar."
-
-  granite3.1-8b:
-    ollama_tag: "granite3.1-dense:8b"
-    category: text
-    parameters_b: 8.2
-    ram_gb: 5.5
-    vram_gb: 5.5
-    profile: "IBM Granite 3.1 — enterprise text, tool-calling."
-
-  # --------- Code ---------
-  qwen2.5-coder-1.5b:
-    ollama_tag: "qwen2.5-coder:1.5b"
-    category: code
-    parameters_b: 1.5
-    ram_gb: 1.2
-    vram_gb: 1.2
-    profile: "Hizli kod tamamlama, snippet, basit refactor."
-
-  qwen2.5-coder-3b:
-    ollama_tag: "qwen2.5-coder:3b"
-    category: code
-    parameters_b: 3.1
-    ram_gb: 2.5
-    vram_gb: 2.5
-    profile: "Orta seviye coding, fonksiyon uretimi."
-
-  qwen2.5-coder-7b:
-    ollama_tag: "qwen2.5-coder:7b"
-    category: code
-    parameters_b: 7.6
-    ram_gb: 5.0
-    vram_gb: 5.0
-    profile: "Tam coding asistani (refactor, code review)."
-
-  # --------- Reasoning ---------
-  deepseek-r1-1.5b:
-    ollama_tag: "deepseek-r1:1.5b"
-    category: reasoning
-    parameters_b: 1.5
-    ram_gb: 1.5
-    vram_gb: 1.5
-    profile: "Step-by-step reasoning, basit matematik."
-
-  deepseek-r1-7b:
-    ollama_tag: "deepseek-r1:7b"
-    category: reasoning
-    parameters_b: 7.0
-    ram_gb: 5.0
-    vram_gb: 5.0
-    profile: "Multi-step reasoning, analitik problemler."
-
-  # --------- Fallback ---------
-  qwen2.5-0.5b:
-    ollama_tag: "qwen2.5:0.5b"
-    category: fallback
-    parameters_b: 0.5
-    ram_gb: 0.5
-    vram_gb: 0.5
-    profile: "Cok hafif yedek model. Genelde her zaman hazir."
+  # ==================== DATACENTER (48 GB+, H100/H200) ====================
+  llama4-scout: {ollama_tag: "llama4:scout", category: text, parameters_b: 109.0, ram_gb: 55.0, vram_gb: 55.0, tier: datacenter, source: ollama, license: "Llama 4", profile: "Llama 4 Scout (MoE 17B aktif) — 10M context, multimodal."}
+  llama4-maverick: {ollama_tag: "llama4:maverick", category: text, parameters_b: 400.0, ram_gb: 245.0, vram_gb: 245.0, tier: datacenter, source: ollama, license: "Llama 4", profile: "Llama 4 Maverick (MoE 17B aktif, 400B toplam) — frontier."}
+  qwen3-235b: {ollama_tag: "qwen3:235b", category: reasoning, parameters_b: 235.0, ram_gb: 140.0, vram_gb: 140.0, tier: datacenter, source: ollama, license: "Apache 2.0", profile: "Qwen3 235B (MoE) — frontier reasoning, AIME lideri."}
+  deepseek-v3: {ollama_tag: "deepseek-v3", category: text, parameters_b: 671.0, ram_gb: 400.0, vram_gb: 400.0, tier: datacenter, source: ollama, license: "MIT", profile: "DeepSeek-V3.2 (671B MoE, 37B aktif) — en iyi genel acik model."}
+  deepseek-r1-671b: {ollama_tag: "deepseek-r1:671b", category: reasoning, parameters_b: 671.0, ram_gb: 400.0, vram_gb: 400.0, tier: datacenter, source: ollama, license: "MIT", profile: "DeepSeek-R1 671B — MATH-500 lideri, IMO altin."}
+  qwen2.5-coder-hf: {ollama_tag: "hf.co/bartowski/Qwen2.5-Coder-32B-Instruct-GGUF", category: code, parameters_b: 32.0, ram_gb: 22.0, vram_gb: 22.0, tier: workstation, source: huggingface, license: "Apache 2.0", profile: "HuggingFace GGUF ornegi — bartowski Qwen2.5 Coder 32B."}
 
 departments:
-  # resource_class    : light / medium / heavy (kaynak ayriminin sinyali)
+  # resource_class    : light / medium / heavy
   # preferred_size    : small / medium / large (router model boyut tercihi)
   # rate_limit_per_min: dakikada maks istek
-  # daily_token_quota : (opsiyonel) gunluk token tavani
-
   hr:
     label: "Insan Kaynaklari"
     primary_category: text
-    allowed_categories: [text, fallback]
+    allowed_categories: [text, persona, fallback]
     resource_class: light
     preferred_size: small
     rate_limit_per_min: 30
@@ -280,7 +100,7 @@ departments:
   legal:
     label: "Hukuk"
     primary_category: text
-    allowed_categories: [text, fallback]
+    allowed_categories: [text, reasoning, fallback]
     resource_class: medium
     preferred_size: medium
     rate_limit_per_min: 20
@@ -296,7 +116,7 @@ departments:
   marketing:
     label: "Pazarlama"
     primary_category: text
-    allowed_categories: [text, fallback]
+    allowed_categories: [text, persona, fallback]
     resource_class: light
     preferred_size: small
     rate_limit_per_min: 30
@@ -304,19 +124,27 @@ departments:
   general:
     label: "Genel Kullanici"
     primary_category: text
-    allowed_categories: [text, fallback]
+    allowed_categories: [text, persona, reasoning, fallback]
     resource_class: light
     preferred_size: small
     rate_limit_per_min: 15
 
 # Kurallar yukaridan asagi degerlendirilir; ilk eslesen kazanir.
 # "@department_primary" tokeni o anki kullanicinin departman varsayilanini ifade eder.
+# Admin "Ayarlar > Kategori atamasi" ile bir kategoride hangi modellerin
+# kullanilacagini ezebilir (category_assignments); router once o atamaya bakar.
 routing_rules:
   - name: "Prompt'ta kod blogu / fonksiyon imzasi varsa coding modeli"
     when:
       prompt_matches: "```|\\bdef \\b|\\bfunction \\b|\\bclass \\b|\\bSELECT \\b|#include|=>|console\\.log"
     then_category: code
     priority: 100
+
+  - name: "Persona / rol yapma istegi"
+    when:
+      prompt_matches: "(?i)\\brol yap\\b|\\bpersona\\b|karakter ol|gibi davran|\\broleplay\\b|canlandir|rolune gir"
+    then_category: persona
+    priority: 90
 
   - name: "Matematik / hesap iceren prompt reasoning'e"
     when:

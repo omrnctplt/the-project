@@ -3,6 +3,7 @@
   let states = [];         // orchestrator states
   let discover = [];       // populer modeller
   let capacity = {};
+  let overridden = [];     // kullanici tarafindan eklenen (silinebilir) model id'leri
   let q = "";
   let cat = "";
   let st = "";
@@ -18,6 +19,7 @@
       capacity = profile.capacity || {};
       const catRes = await api("/api/v1/system/catalog");
       catalog = catRes.models || {};
+      overridden = catRes.overridden || [];
       const modelsRes = await api("/api/v1/models");
       states = modelsRes.states || [];
       const dis = await api("/api/v1/system/discover");
@@ -30,7 +32,7 @@
 
   function render() {
     // Merge: tum bilinen modeller (catalog) + discover items
-    const byCat = { text: [], code: [], reasoning: [], fallback: [] };
+    const byCat = { text: [], code: [], reasoning: [], persona: [], fallback: [] };
     const seenTags = new Set();
 
     // Catalog'taki modeller (gercek state ile)
@@ -40,17 +42,22 @@
       const item = {
         source: "catalog",
         model_id: mid,
-        label: def.profile || mid,
+        label: mid.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+        blurb: def.profile || "",
         ollama_tag: def.ollama_tag,
         category: def.category || "text",
         ram_gb: def.ram_gb,
         parameters_b: def.parameters_b,
+        tier: def.tier,
+        src: def.source,
+        license: def.license,
         status: state?.status || "unknown",
         pulled: !!state?.pulled,
         inflight: state?.inflight_requests || 0,
         total_req: state?.total_requests || 0,
         avg_ms: state?.avg_latency_ms,
         fits,
+        overridden: overridden.includes(mid),
       };
       if (!byCat[item.category]) byCat[item.category] = [];
       byCat[item.category].push(item);
@@ -96,9 +103,10 @@
       text: "Metin / sozel",
       code: "Kod / programlama",
       reasoning: "Reasoning / mantik",
+      persona: "Persona / rol yapma",
       fallback: "Fallback (hafif yedek)"
     };
-    const order = ["fallback", "text", "code", "reasoning"];
+    const order = ["fallback", "text", "code", "reasoning", "persona"];
 
     acc.innerHTML = "";
     let total = 0;
@@ -142,6 +150,8 @@
       : '<span class="badge warn">butce yetersiz</span>';
     const sizeBadge = `<span class="badge plain">${it.ram_gb || "?"} GB</span>`;
     const paramBadge = it.parameters_b ? `<span class="badge plain">${it.parameters_b}B param</span>` : "";
+    const tierBadge = it.tier ? `<span class="badge plain">${escapeHtml(it.tier)}</span>` : "";
+    const hfBadge = it.src === "huggingface" ? '<span class="badge busy">HF</span>' : "";
 
     let actions = "";
     if (it.source === "discover") {
@@ -149,19 +159,27 @@
         <button class="primary" data-action="add-pull" data-tag="${escapeHtml(it.ollama_tag)}" data-cat="${it.category}" data-gb="${it.ram_gb}" data-label="${escapeHtml(it.label)}" ${it.fits ? "" : "disabled title='Butceye sigmiyor'"}>+ Ekle & pull</button>
       `;
     } else if (!it.pulled) {
-      actions = `
-        <button class="primary" data-action="pull" data-mid="${escapeHtml(it.model_id)}">Pull et</button>
-        <button data-action="remove" data-mid="${escapeHtml(it.model_id)}">Sil</button>
-      `;
+      actions = `<button class="primary" data-action="pull" data-mid="${escapeHtml(it.model_id)}" ${it.fits ? "" : "title='Butceye sigmiyor'"}>Pull et</button>`;
+      if (it.overridden) {
+        actions += `<button class="danger small" data-action="remove" data-mid="${escapeHtml(it.model_id)}">Katalogdan sil</button>`;
+      }
     } else {
       actions = `
         <button data-action="test" data-mid="${escapeHtml(it.model_id)}">Hizli test</button>
+        <button class="danger small" data-action="delete-pulled" data-mid="${escapeHtml(it.model_id)}">Ollama'dan sil</button>
       `;
     }
     const stats = it.total_req > 0
       ? `<div class="muted" style="font-size:0.72rem;">${it.total_req} istek · ort ${it.avg_ms ? Math.round(it.avg_ms) : "—"} ms</div>`
       : "";
     const cls = `model-card ${it.pulled ? "in-catalog" : ""} ${it.fits ? "fits-current" : ""}`;
+    const budgetTotal = parseFloat(capacity.budget_total_gb || 0);
+    const pct = budgetTotal ? Math.min(100, (parseFloat(it.ram_gb || 0) / budgetTotal) * 100) : 0;
+    const usageBar = budgetTotal ? `
+      <div style="margin-top:0.45rem;">
+        <div class="muted" style="font-size:0.7rem; display:flex; justify-content:space-between;"><span>Butce payi</span><span>${pct.toFixed(0)}%</span></div>
+        <div class="cbar-track" style="margin-top:0.2rem;"><div class="cbar-fill" style="width:${pct}%; background:${it.fits ? "var(--accent)" : "var(--warn)"};"></div></div>
+      </div>` : "";
     return `
       <div class="${cls}">
         <div class="head">
@@ -171,7 +189,8 @@
           </div>
         </div>
         ${it.blurb ? `<div class="blurb">${escapeHtml(it.blurb)}</div>` : ""}
-        <div class="meta">${sizeBadge}${paramBadge}${statusBadge}${stateBadge}${fitsBadge}</div>
+        <div class="meta">${sizeBadge}${paramBadge}${tierBadge}${statusBadge}${stateBadge}${fitsBadge}${hfBadge}</div>
+        ${usageBar}
         ${stats}
         <div class="actions">${actions}</div>
       </div>
@@ -234,6 +253,12 @@
           body: JSON.stringify({ prompt: "Merhaba, tek cumlede kendini tanit.", model_id: btn.dataset.mid }),
         });
         toast(`Test OK · ${Math.round(r.latency_ms)} ms · ${r.eval_count} tok`, "ok", 4500);
+      } else if (act === "delete-pulled") {
+        if (!confirm(`'${btn.dataset.mid}' modeli Ollama'dan silinsin mi? Disk bosalir, gerektiginde tekrar pull edebilirsiniz.`)) {
+          btn.disabled = false; btn.textContent = orig; return;
+        }
+        await api(`/api/v1/system/models/${encodeURIComponent(btn.dataset.mid)}/pulled`, { method: "DELETE" });
+        toast("Model Ollama'dan silindi", "ok");
       }
       setTimeout(refresh, 500);
     } catch (err) {
@@ -266,8 +291,8 @@
     modal({
       title: "Ozel model ekle",
       body: `
-        <p class="muted" style="margin-top:0;">Ollama Library'den herhangi bir tag ekleyebilirsiniz. Boyutu tahmin etmek icin <strong>Inspect</strong> butonunu kullanin (model Ollama'ya bir kez pull edilmis olmali) ya da manuel girin.</p>
-        <label>Ollama tag <input id="cm_tag" placeholder="orn: gemma4:e4b" /></label>
+        <p class="muted" style="margin-top:0;">Ollama Library veya HuggingFace'ten model ekleyin. HuggingFace icin tag'i <code>hf.co/kullanici/depo-GGUF</code> formatinda girin — sistem otomatik HF olarak isaretler. Boyut icin <strong>Inspect</strong> (once pull gerekli) ya da manuel girin.</p>
+        <label>Ollama / HuggingFace tag <input id="cm_tag" placeholder="orn: qwen3:8b  veya  hf.co/bartowski/Qwen3-8B-GGUF" /></label>
         <label>Kategori <select id="cm_cat">
           <option value="text">Metin</option>
           <option value="code">Kod</option>

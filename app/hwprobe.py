@@ -21,7 +21,11 @@ from typing import Any
 
 import psutil
 
+from .config import DATA_DIR
+
 log = logging.getLogger(__name__)
+
+HW_PROFILE_PATH = DATA_DIR / "hw_profile.json"
 
 
 def _read_cgroup_mem_limit_gb() -> float | None:
@@ -218,8 +222,8 @@ def detect_memory() -> dict[str, Any]:
     }
 
 
-def detect_disk(path: str = "/data") -> dict[str, Any]:
-    target = path if Path(path).exists() else "/"
+def detect_disk(path: str | Path = DATA_DIR) -> dict[str, Any]:
+    target = str(path) if Path(path).exists() else "/"
     du = psutil.disk_usage(target)
     return {
         "path": target,
@@ -244,14 +248,14 @@ def probe() -> dict[str, Any]:
     }
 
 
-def write_profile(profile: dict[str, Any], path: str | Path = "/data/hw_profile.json") -> Path:
+def write_profile(profile: dict[str, Any], path: str | Path = HW_PROFILE_PATH) -> Path:
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(json.dumps(profile, indent=2, ensure_ascii=False))
     return p
 
 
-def load_profile(path: str | Path = "/data/hw_profile.json") -> dict[str, Any] | None:
+def load_profile(path: str | Path = HW_PROFILE_PATH) -> dict[str, Any] | None:
     p = Path(path)
     if not p.exists():
         return None

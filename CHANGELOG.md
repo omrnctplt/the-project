@@ -2,6 +2,48 @@
 
 Tum dikkat ceken degisiklikler bu dosyada listelenir. Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardina yakindir.
 
+## [0.5.0] - 2026-06-03
+
+Donanim-farkindalikli dinamik model havuzu + admin kategori yonetimi.
+
+### Added
+- **Donanima gore dinamik oneri** — `edge / laptop / workstation / datacenter` tier'lari; discover endpoint donanima gore onerir (laptop'ta kucuk modeller, H100/H200'de dev modeller)
+- **Guncel & kapsamli model havuzu** — 41 model: Qwen3, Llama 4 (Scout/Maverick), DeepSeek-V3/R1, Gemma 3, Phi-4, Mistral, Mixtral, Kimi, SmolLM3, gpt-oss, IBM Granite... her birinde tier + kaynak + lisans
+- **Persona / rol yapma kategorisi** — routing kurali + katalog + departman destegi
+- **Admin kategori → model atamasi** — her amac (kod/metin/reasoning/persona) icin model secimi; router bu atamaya oncelik verir
+- **HuggingFace model destegi** — `hf.co/...` GGUF tag'leri ile tek-tik ekleme + pull; kaynak otomatik isaretlenir
+- **Ollama'dan gercek silme** — disk bosaltan kaldirma endpoint'i (`DELETE /api/v1/system/models/{id}/pulled`) + UI
+- **Model kaynak gorsellestirme** — kart basina butce-payi cubugu, tier ve kaynak (HF) rozetleri
+
+### Changed
+- discover endpoint statik liste yerine katalog havuzundan **tier-farkindalikli** uretir
+- Kategori onceligi `persona`'yi da kapsar; performance profili persona modellerini aktif edebilir
+
+### Fixed
+- Statik varlik cache-busting surum bump'i ile dogru calisir (`?v=0.5.0`)
+
+## [0.4.0] - 2026-06-03
+
+UX/UI olgunlasmasi + dayaniklilik (resilience) iyilestirmeleri.
+
+### Added
+- **Sohbet markdown render** — kod blogu (kopyala butonlu), liste, baslik, kalin/italik, link; bagimliliksiz, XSS'siz renderer
+- **Streaming kontrolleri** — Durdur (AbortController ile iptal), yaniti kopyala, yeniden uret; canli `tok/s` hiz gostergesi
+- **Tema sistemi** — acik / koyu / sistem; FOUC'suz on-yukleme, kalici tercih, `prefers-color-scheme` takibi
+- **Erisilebilirlik** — gorunur odak halkalari (`:focus-visible`), `aria-current`, `prefers-reduced-motion` ile hareket azaltma
+- **Mobil drawer** — hamburger menu + backdrop; sohbet mobilde tek kolon; dusuk-guc cihaz tespiti ile efekt kisma
+- **Dashboard grafikleri** — bagimliliksiz SVG: bellek butcesi donut'u, model durumu ve kullanim barlari + skeleton shimmer
+- **Statik varlik cache-busting** — `?v=<surum>` ile surum atlamalarinda bayat JS/CSS sorunu onlenir
+- **HTTP guvenlik basliklari** — CSP, `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy` (middleware); `/docs` Swagger CDN icin CSP disinda; rate-limit 429'da `Retry-After`
+- **Chat verimliligi** — yaraticilik (temperature) secici, markdown disa aktar, `Ctrl/Cmd+Shift+O` yeni-sohbet kisayolu, streaming `aria-live`
+- **Test kapsami genisletildi** — auth, usage/rate-limit, config, audit, orchestrator, ollama_client + uctan uca endpoint & guvenlik testleri (16 -> 68)
+
+### Fixed
+- **Streaming gecikmesi** — `chat/stream` isteklerinde usage + audit'e 0 yerine gercek `latency_ms` yaziliyor
+- **Versiyon tutarliligi** — tek kaynak (`app.__version__`); FastAPI, UI ve API tum yuzeylerde senkron
+- **Donanim profili yolu** — `hw_profile.json` artik `DATA_DIR`'e yaziliyor (eskiden sabit `/data`)
+- **Starlette `TemplateResponse`** — guncel imza (deprecation uyarisi giderildi)
+
 ## [0.3.1] - 2026-05-20
 
 ### Added

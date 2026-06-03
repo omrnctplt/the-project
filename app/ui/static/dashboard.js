@@ -41,6 +41,7 @@
 
     kvRows(document.getElementById("capTable"), [
       ["Profil", `${cap.profile_label || cap.profile || "?"}`],
+      ["Donanim sinifi", (cap.hardware_tier || "?").toUpperCase()],
       ["Hizlandirici", (cap.accelerator || "?").toUpperCase()],
       ["Butce kullanim", `${fmtNumber(cap.budget_used_gb, 2)} / ${fmtNumber(cap.budget_total_gb, 2)} GB`],
       ["Max yuklu model", cap.max_loaded_models || 1],
@@ -48,6 +49,20 @@
       ["Beklenen kullanici", cap.expected_users || "—"],
       ["Uyarilar", (cap.warnings || []).length ? (cap.warnings || []).join(" · ") : "—"],
     ]);
+
+    if (window.Charts) {
+      Charts.donut(
+        document.getElementById("budgetDonut"),
+        cap.budget_used_gb || 0, cap.budget_total_gb || 0,
+        {
+          sub: `${fmtNumber(cap.budget_used_gb, 1)}/${fmtNumber(cap.budget_total_gb, 1)} GB`,
+          aria: "Bellek butce kullanim orani",
+        }
+      );
+      const note = document.getElementById("budgetNote");
+      if (note) note.textContent =
+        `${(cap.accelerator || "?").toUpperCase()} · bos ${fmtNumber(cap.budget_free_gb, 1)} GB`;
+    }
   } catch (e) { console.error(e); }
 
   // Host CPU mini widget (admin only — uses resources endpoint)
@@ -88,6 +103,16 @@
       tr.innerHTML = `<td colspan="6" class="muted"><a href="/ui/models">+ ${sorted.length - 8} model daha — tumune git</a></td>`;
       tb.appendChild(tr);
     }
+
+    if (window.Charts) {
+      const counts = {};
+      for (const s of (models.states || [])) counts[s.status] = (counts[s.status] || 0) + 1;
+      const order = ["loaded", "ready", "pulling", "passive", "unknown", "error"];
+      const labelTr = { loaded: "Yuklu", ready: "Hazir", pulling: "Iniyor", passive: "Pasif", unknown: "Bilinmiyor", error: "Hata" };
+      const colorOf = { loaded: "var(--ok)", ready: "var(--accent)", pulling: "var(--warn)", passive: "var(--muted-2)", unknown: "var(--surface-3)", error: "var(--danger)" };
+      const items = order.filter(k => counts[k]).map(k => ({ label: labelTr[k] || k, value: counts[k], color: colorOf[k] }));
+      Charts.bars(document.getElementById("statusBars"), items, { empty: "Henuz model yok" });
+    }
   } catch (e) { console.error(e); }
 
   // Usage
@@ -110,6 +135,11 @@
         tr.innerHTML = `<td>${m}</td><td style="text-align:right; font-variant-numeric:tabular-nums;">${c}</td>`;
         tb2.appendChild(tr);
       }
+    }
+    if (window.Charts) {
+      const items = entries.map(([m, c]) => ({ label: m, value: c }))
+        .sort((a, b) => b.value - a.value).slice(0, 6);
+      Charts.bars(document.getElementById("usageBars"), items, { empty: "Henuz istek yok" });
     }
   } catch (e) { console.error(e); }
 

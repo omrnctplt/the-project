@@ -97,6 +97,71 @@
     if (!(a.entries || []).length) tb.innerHTML = `<tr><td colspan="8" class="muted">Denetim kaydi bos</td></tr>`;
   } catch (e) { console.error(e); }
 
+  // --- Kategori -> model atamasi ---
+  const ASSIGN_CATS = [
+    { key: "code", label: "Kodlama" },
+    { key: "text", label: "Metin / genel" },
+    { key: "reasoning", label: "Reasoning / matematik" },
+    { key: "persona", label: "Persona / rol yapma" },
+  ];
+  let _allModels = [];
+  let _assignments = {};
+
+  async function loadCatAssign() {
+    try {
+      const cfg = await api("/api/v1/system/config");
+      _assignments = cfg.category_assignments || {};
+      const cat = await api("/api/v1/system/catalog");
+      const models = cat.models || {};
+      _allModels = Object.entries(models).map(([mid, d]) => ({
+        model_id: mid, category: d.category || "text",
+      }));
+      renderCatAssign();
+    } catch (e) { console.error(e); }
+  }
+
+  function renderCatAssign() {
+    const root = document.getElementById("catAssignList");
+    if (!root) return;
+    root.innerHTML = "";
+    for (const c of ASSIGN_CATS) {
+      const inCat = _allModels.filter(m => m.category === c.key);
+      const sel = new Set(_assignments[c.key] || []);
+      const section = document.createElement("div");
+      section.className = "card";
+      section.style.marginBottom = "0.75rem";
+      section.style.background = "var(--bg-elev)";
+      const boxes = inCat.length
+        ? inCat.map(m => `
+            <label class="checkbox" style="font-size:0.82rem;">
+              <input type="checkbox" data-cat="${c.key}" value="${escapeHtml(m.model_id)}" ${sel.has(m.model_id) ? "checked" : ""} />
+              ${escapeHtml(m.model_id)}
+            </label>`).join("")
+        : '<span class="muted" style="font-size:0.82rem;">Bu kategoride katalog modeli yok.</span>';
+      section.innerHTML = `
+        <h3 style="margin-top:0;">${escapeHtml(c.label)} <span class="muted">(${sel.size} secili)</span></h3>
+        <div class="grid three">${boxes}</div>`;
+      root.appendChild(section);
+    }
+  }
+
+  const saveCatBtn = document.getElementById("saveCatAssign");
+  if (saveCatBtn) {
+    saveCatBtn.onclick = async () => {
+      const result = {};
+      document.querySelectorAll('#catAssignList input[type=checkbox]:checked').forEach((cb) => {
+        (result[cb.dataset.cat] = result[cb.dataset.cat] || []).push(cb.value);
+      });
+      try {
+        await api("/api/v1/system/config", { method: "PUT", body: JSON.stringify({ category_assignments: result }) });
+        _assignments = result;
+        renderCatAssign();
+        toast("Kategori atamalari kaydedildi ve plan yenilendi", "ok");
+      } catch (e) { toast("Kaydetme hatasi: " + e.message, "error", 5000); }
+    };
+  }
+  loadCatAssign();
+
   // --- Password modal ---
   document.getElementById("changePwBtn").onclick = () => {
     modal({

@@ -23,11 +23,13 @@ Kucuk ekipler icin Ollama'nin onunde duran bir yonlendirme katmani. Sistem ilk a
 
 ### UI (premium, sidebar layout)
 - **Onboarding sihirbazi:** Ilk acilista donanim ozeti + kategoriye gore filtrelenmis model kartlari (yesil cerceveli olanlar butceye sigar)
-- **ChatGPT-tarzi sohbet:** Sol konusma gecmisi, sag akan mesajlar, sticky textarea, streaming cursor (▌), departman bazli ornek prompt kartlari
+- **ChatGPT-tarzi sohbet:** Sol konusma gecmisi, akan mesajlar, **markdown render** (kod blogu kopyala butonlu), **Durdur / yeniden uret / tok/s**, markdown disa aktar, departman bazli ornek prompt kartlari
 - **Modeller sayfasi:** Arama + kategori/durum filtresi + accordion + model kartlari (pull / sil / hizli test)
 - **Sistem kaynaklari sayfasi (admin):** Host CPU/mem/disk progress bar, top processes, Docker container stats, otomatik aksiyon onerileri
 - **Yonetim:** Profil/kullanicilar/kullanim/denetim tab'lari + sifre degistirme modal
-- **Genel bakis:** Donanim, kapasite, model durumu, kullanim metrikleri tek ekranda
+- **Genel bakis:** Donanim, kapasite, model durumu + **bagimliliksiz SVG grafikler** (bellek butcesi donut'u, model durumu barlari)
+- **Tema:** Acik / koyu / sistem temasi — kalici tercih, FOUC'suz on-yukleme
+- **Mobil + erisilebilirlik:** Hamburger drawer, dokunmatik uyum, dusuk-guc cihazda efekt kismasi, gorunur odak halkalari, `prefers-reduced-motion`
 
 ### Routing & kapasite
 - **4 profil:** `lite` (cok dusuk kaynak) / `balanced` (laptop) / `performance` (GPU) / `auto`
@@ -37,7 +39,10 @@ Kucuk ekipler icin Ollama'nin onunde duran bir yonlendirme katmani. Sistem ilk a
 - **Fallback chain:** Hedef kategoride hazir model yoksa fallback'a duser
 
 ### Model katalogu
-- **29+ model tanimi** + dinamik **discover** listesi (Gemma 4, Qwen3, Phi-4, DeepSeek-R1, Mistral, Granite, SmolLM2...)
+- **41 model havuzu** — donanim tier'li (edge/laptop/workstation/datacenter): Qwen3, Llama 4 (Scout/Maverick), DeepSeek-V3/R1, Gemma 3, Phi-4, Mistral, Mixtral, Kimi, SmolLM3, gpt-oss, Granite...
+- **Donanima gore dinamik oneri** — discover, donanim tier'ina gore uygun modelleri one cikarir (laptop'ta kucuk, H100/H200'de dev modeller)
+- **Persona / rol yapma** kategorisi + admin **kategori → model atamasi** (Ayarlar sayfasi)
+- **HuggingFace destegi** — `hf.co/...` GGUF tag'leri ile tek-tik ekleme + pull; **Ollama'dan gercek silme** (disk bosaltir)
 - **Inspect:** Ollama `/api/show` ile gercek boyut tahmini
 - **Dry-run:** Modeli eklemeden once "tum profillerde butceye sigar mi?" raporu
 - **Override katmani:** `data/catalog_overrides.yaml` ile kullanici eklemeleri YAML'a dokunmadan saklanir
@@ -55,6 +60,8 @@ Kucuk ekipler icin Ollama'nin onunde duran bir yonlendirme katmani. Sistem ilk a
 - **Rate limit** departman bazli (in-memory sliding window)
 - **Rol bazli erisim:** `admin` / `user`
 - **Sifre degistirme** endpoint'i + UI modal
+- **HTTP guvenlik basliklari:** CSP, `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy` (middleware; `/docs` Swagger CDN icin CSP disinda)
+- **Rate-limit** 429 yanitlarinda `Retry-After` header
 
 ---
 
@@ -197,7 +204,7 @@ routing_rules:
 
 ## Model katalogu
 
-`config/model_catalog.yaml` icinde 29+ model tanimli. Aktif/pasif ayrimi profil + donanima gore otomatik.
+`config/model_catalog.yaml` icinde 41 model tanimli (her birinde donanim `tier`'i + `source` + `license`). Aktif/pasif ayrimi profil + donanima gore otomatik; discover, donanim tier'ina gore oneri yapar (edge → laptop → workstation → datacenter).
 
 ### Yeni model ekleme (uc yontem)
 
@@ -405,7 +412,7 @@ IDLE_UNLOAD_MINUTES=3
 │   ├── preflight.sh          # Linux/Mac
 │   └── preflight.ps1         # Windows PowerShell
 ├── simulator/                # Yuk uretici container
-├── tests/                    # pytest (capacity + router, 16 test)
+├── tests/                    # pytest (capacity, router, auth, usage, config, audit, orchestrator, ollama_client, integration — 74 test)
 ├── data/                     # Runtime: users.db + audit.db + usage.db
 │                             # + runtime_config.yaml + catalog_overrides.yaml
 ├── docker-compose.yml
@@ -445,7 +452,7 @@ pytest -q tests/
 docker compose up -d --build gateway
 ```
 
-Tum unit testler 16/16 gecmeli (`pytest -q tests/`).
+Tum testler gecmeli — **74 test** (`pytest -q tests/`).
 
 ---
 

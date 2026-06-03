@@ -35,6 +35,22 @@
   </div>
 </section>
 
+<section class="grid three" style="margin-top:1rem;">
+  <div class="card chart-card">
+    <h3>Bellek butcesi</h3>
+    <div id="budgetDonut" class="donut-wrap"></div>
+    <div class="muted" id="budgetNote" style="text-align:center; font-size:0.78rem;"></div>
+  </div>
+  <div class="card chart-card">
+    <h3>Model durumu dagilimi</h3>
+    <div id="statusBars"></div>
+  </div>
+  <div class="card chart-card">
+    <h3>Kullaniminiz (model bazinda)</h3>
+    <div id="usageBars"></div>
+  </div>
+</section>
+
 <section class="card" style="margin-top:1rem;">
   <div class="grid two">
     <div>
@@ -79,5 +95,6 @@
 </section>
 {% endblock %}
 {% block scripts %}
-<script src="/static/dashboard.js"></script>
+<script src="/static/charts.js?v={{ app_version }}"></script>
+<script src="/static/dashboard.js?v={{ app_version }}"></script>
 {% endblock %}

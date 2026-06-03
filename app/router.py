@@ -38,13 +38,20 @@ class RoutingDecision:
 
 
 class Router:
-    def __init__(self, catalog: dict[str, Any], orchestrator: Orchestrator):
+    def __init__(
+        self,
+        catalog: dict[str, Any],
+        orchestrator: Orchestrator,
+        category_assignments: dict[str, list[str]] | None = None,
+    ):
         self.catalog = catalog
         self.orchestrator = orchestrator
         rules = catalog.get("routing_rules") or []
         self._rules = sorted(rules, key=lambda r: -int(r.get("priority", 0)))
         self._departments: dict[str, dict[str, Any]] = catalog.get("departments", {}) or {}
         self._models_def: dict[str, dict[str, Any]] = catalog.get("models", {}) or {}
+        # Admin kategori -> model_id atamasi (varsa kategoriyi ezer)
+        self._assignments: dict[str, list[str]] = category_assignments or {}
 
     def _department(self, department: str) -> dict[str, Any]:
         return self._departments.get(department) or self._departments.get("general") or {}
@@ -90,19 +97,22 @@ class Router:
         category: str,
         size_pref: str,
     ) -> str | None:
-        """Hazir + bu kategoride olan modeller arasinda size_pref'e en yakin olani sec."""
-        # Once hazir olanlar (ready/loaded)
+        """Bu kategorideki uygun modeller arasinda size_pref'e en yakin olani sec.
+
+        Admin bu kategoriye model atamissa (category_assignments) yalnizca o
+        modeller degerlendirilir; aksi halde modelin katalog kategorisi baz alinir.
+        """
         states = self.orchestrator.states()
-        candidates = [
-            s for s in states
-            if s["category"] == category and s["status"] in ("ready", "loaded")
-        ]
+        assigned = self._assignments.get(category) or []
+
+        def _match(s: dict[str, Any]) -> bool:
+            return (s["model_id"] in assigned) if assigned else (s["category"] == category)
+
+        # Once hazir olanlar (ready/loaded)
+        candidates = [s for s in states if _match(s) and s["status"] in ("ready", "loaded")]
         if not candidates:
             # Pulling/unknown olanlar — hala bekleyebilir
-            candidates = [
-                s for s in states
-                if s["category"] == category and s["status"] in ("pulling", "unknown")
-            ]
+            candidates = [s for s in states if _match(s) and s["status"] in ("pulling", "unknown")]
         if not candidates:
             return None
 
