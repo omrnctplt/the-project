@@ -377,6 +377,13 @@
     }
   })();
 
+  /* ---------- Izleme linkleri: sunucunun adresine gore dinamik ----------
+     LAN'dan erisen calisanlarda localhost kirilir; gateway hangi host'tan
+     acildiysa Grafana/Prometheus da ayni host uzerinden linklenir. */
+  document.querySelectorAll("[data-monitor-link]").forEach((a) => {
+    a.href = location.protocol + "//" + location.hostname + ":" + a.dataset.monitorLink;
+  });
+
   /* ---------- Mobil navigasyon (drawer) ---------- */
   (function setupMobileNav() {
     const toggle = document.getElementById("navToggle");

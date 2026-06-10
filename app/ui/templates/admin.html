@@ -72,9 +72,13 @@
 
 <div class="tab-panel" data-panel="users">
   <div class="card">
-    <h2>Kullanicilar</h2>
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap;">
+      <h2 style="margin:0;">Kullanicilar</h2>
+      <button id="newUserBtn" class="primary small">+ Yeni kullanici</button>
+    </div>
+    <p class="muted" style="font-size:0.8rem;">Calisanlara buradan hesap acin; LAN'daki herkes <code>http://&lt;sunucu-ip&gt;:8080</code> adresinden kendi hesabiyla giris yapar. Rol/departman degisikligi kullanicinin bir sonraki girisinde gecerli olur.</p>
     <table id="usersTable" class="data">
-      <thead><tr><th>Kullanici</th><th>Departman</th><th>Rol</th><th>Etiket</th><th>Son giris</th></tr></thead>
+      <thead><tr><th>Kullanici</th><th>Departman</th><th>Rol</th><th>Etiket</th><th>Son giris</th><th>Islem</th></tr></thead>
       <tbody></tbody>
     </table>
   </div>

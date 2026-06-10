@@ -5,8 +5,9 @@ SHELL := /usr/bin/env bash
 COMPOSE := docker compose
 COMPOSE_GPU := docker compose -f docker-compose.yml -f docker-compose.gpu.yml
 
-.PHONY: help preflight up up-gpu down restart logs ps health test test-watch \
-        build pull-base reset clean catalog seed sim grafana-open prom-open
+.PHONY: help preflight up up-gpu up-tls down restart logs ps health test test-watch \
+        build pull-base reset clean catalog seed sim grafana-open prom-open \
+        backup restore
 
 help:  ## Bu yardim
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -67,6 +68,23 @@ pull-base:  ## Base image'leri onceden cek (python, ollama)
 
 sim:  ## Yuk simulatorunu calistir (profile=sim)
 	$(COMPOSE) --profile sim up --build simulator
+
+up-tls:  ## HTTPS (Caddy) overlay ile ayaga kaldir — LAN icin onerilir
+	$(COMPOSE) -f docker-compose.yml -f docker-compose.tls.yml up -d --build
+
+backup:  ## data/ klasorunu (kullanici DB + audit + config) tarihli arsivle
+	@mkdir -p backups
+	@tar czf backups/inference-hub-data-$$(date +%Y%m%d-%H%M%S).tgz data/
+	@ls -lh backups/ | tail -3
+
+restore:  ## En son yedegi geri yukle (once servisleri durdurur)
+	@LATEST=$$(ls -t backups/inference-hub-data-*.tgz 2>/dev/null | head -1); \
+	if [ -z "$$LATEST" ]; then echo "backups/ icinde yedek yok"; exit 1; fi; \
+	echo "Geri yukleniyor: $$LATEST"; \
+	$(COMPOSE) stop gateway; \
+	tar xzf "$$LATEST"; \
+	$(COMPOSE) start gateway; \
+	echo "Tamam — gateway yeniden baslatildi."
 
 reset:  ## Tum container ve volume'leri SIL (data kaybolur)
 	$(COMPOSE) down --volumes --remove-orphans

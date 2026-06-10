@@ -2,6 +2,27 @@
 
 Tum dikkat ceken degisiklikler bu dosyada listelenir. Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardina yakindir.
 
+## [0.8.0] - 2026-06-10
+
+Sirket ici (LAN) kurulum paketi: kullanici yonetimi + ag guvenligi sertlestirmesi.
+
+### Added
+- **Admin kullanici yonetimi** — Ayarlar → Kullanicilar: yeni calisan hesabi acma (departman/rol secimi), sifre sifirlama, departman/rol duzenleme, hesap silme; tum islemler audit'e yazilir (`POST/PUT /api/v1/users`)
+- **TLS overlay** — `make up-tls`: Caddy 443'te ic CA ile HTTPS sonlandirir, gateway portu localhost'a alinir (`docker-compose.tls.yml` + `deploy/Caddyfile`)
+- **README "Sirket aginda erisim (LAN)"** — sunucu IP, firewall (ufw/Windows), calisan hesabi acma, port matrisi ve guvenlik tablosu
+- **`make backup` / `make restore`** — `data/` (kullanici DB + audit + config) tarihli arsiv + geri yukleme
+- **Preflight uretim kontrolleri** — DEMO_MODE acik ve ADMIN_PASSWORD zayifsa uyari (sh + ps1)
+
+### Changed
+- **Prometheus varsayilan localhost-only** — `--web.enable-lifecycle` auth'suz oldugundan LAN'a kapatildi (Grafana ic agdan erisir; `PROM_BIND=0.0.0.0` ile acilabilir)
+- **Grafana anonim erisim varsayilan kapali** — `GRAFANA_ANONYMOUS=true` ile demo modu
+- **UI izleme linkleri host-bagimsiz** — Grafana/Prometheus linkleri `location.hostname` uzerinden uretilir; LAN'dan giren calisanlarda artik kirilmaz
+- **Login brute-force limiti yapilandirilabilir** — `LOGIN_RATE_PER_MIN` env (varsayilan 10/dk)
+
+### Fixed
+- **CPU sicaklik fallback'i disk sensorunu atlar** — sogutucusuz NVMe (85-95°C) CPU degeri sanilip sahte "asiri isinma" uyarisi uretebiliyordu
+- **Sicaklik test paketi sertlestirildi** — `/sys/class/thermal` govde + baglanti testleri, ayirt edici sensor onceligi, 89.9/90.0 esik siniri, disk-atlanir fallback (131 test)
+
 ## [0.7.2] - 2026-06-10
 
 ### Added

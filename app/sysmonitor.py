@@ -69,7 +69,11 @@ def cpu_temperature() -> float | None:
         v = _max_reasonable(temps.get(key))
         if v is not None:
             return v
-    for entries in temps.values():
+    # Genel fallback: disk sensorlerini atla — sogutucusuz NVMe 85-95°C
+    # gorebilir; CPU degeri sanilirsa sahte "asiri isinma" uyarisi uretir.
+    for key, entries in temps.items():
+        if key in _DISK_SENSOR_KEYS:
+            continue
         v = _max_reasonable(entries)
         if v is not None:
             return v

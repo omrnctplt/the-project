@@ -58,9 +58,11 @@ class _T:
 
 
 def test_cpu_temperature_prefers_known_sensor(monkeypatch):
+    # acpitz (70.0) global maksimum ama coretemp oncelik listesinde once gelir;
+    # oncelik mantigi silinip "global max" yapilirsa bu test 70.0 gorur ve kirilir.
     monkeypatch.setattr(
         sysmonitor.psutil, "sensors_temperatures",
-        lambda: {"acpitz": [_T(38.0)], "coretemp": [_T(47.0), _T(52.5)]},
+        lambda: {"acpitz": [_T(70.0)], "coretemp": [_T(47.0), _T(52.5)]},
         raising=False,
     )
     assert sysmonitor.cpu_temperature() == 52.5
@@ -119,3 +121,58 @@ def test_actions_quiet_on_normal_cpu_temp():
     host["cpu_temp_c"] = 55.0
     actions = sysmonitor.actions_for_state(host, [])
     assert not any("sicakligi" in a["title"] for a in actions)
+
+
+def test_cpu_temp_threshold_boundary():
+    # Esik tam 90: 89.9 sessiz, 90.0 uyari — esik kaymasi regresyonunu yakalar
+    quiet = _host()
+    quiet["cpu_temp_c"] = 89.9
+    assert not any("CPU sicakligi" in a["title"]
+                   for a in sysmonitor.actions_for_state(quiet, []))
+    hot = _host()
+    hot["cpu_temp_c"] = 90.0
+    assert any("CPU sicakligi" in a["title"]
+               for a in sysmonitor.actions_for_state(hot, []))
+
+
+def test_cpu_temperature_fallback_skips_disk_sensors(monkeypatch):
+    # CPU sensoru yok, sadece sicak NVMe var: disk degeri CPU sanilmamali
+    monkeypatch.setattr(
+        sysmonitor.psutil, "sensors_temperatures",
+        lambda: {"nvme": [_T(92.0)]},
+        raising=False,
+    )
+    monkeypatch.setattr(sysmonitor, "_read_thermal_zones", lambda: None)
+    assert sysmonitor.cpu_temperature() is None
+
+
+def test_cpu_temperature_uses_thermal_zone_fallback(monkeypatch):
+    # Sensor hic yokken /sys/class/thermal fallback'inin BAGLANTISI dogrulanir
+    monkeypatch.setattr(sysmonitor.psutil, "sensors_temperatures", lambda: {}, raising=False)
+    monkeypatch.setattr(sysmonitor, "_read_thermal_zones", lambda: 47.5)
+    assert sysmonitor.cpu_temperature() == 47.5
+
+
+def test_read_thermal_zones_parses_millidegrees(tmp_path, monkeypatch):
+    # Govde testi: milidereceden bolme, 1-120 filtre ve max secimi
+    z1 = tmp_path / "thermal_zone0"
+    z2 = tmp_path / "thermal_zone1"
+    z3 = tmp_path / "thermal_zone2"
+    for z in (z1, z2, z3):
+        z.mkdir()
+    (z1 / "temp").write_text("46500\n")     # 46.5 °C
+    (z2 / "temp").write_text("61000\n")     # 61.0 °C  -> max
+    (z3 / "temp").write_text("125000\n")    # 125 °C   -> filtre disi
+    monkeypatch.setattr(
+        sysmonitor.glob, "glob",
+        lambda pattern: [str(z / "temp") for z in (z1, z2, z3)],
+    )
+    assert sysmonitor._read_thermal_zones() == 61.0
+
+
+def test_read_thermal_zones_handles_garbage(tmp_path, monkeypatch):
+    z = tmp_path / "thermal_zone0"
+    z.mkdir()
+    (z / "temp").write_text("bozuk-deger")
+    monkeypatch.setattr(sysmonitor.glob, "glob", lambda pattern: [str(z / "temp")])
+    assert sysmonitor._read_thermal_zones() is None

@@ -99,7 +99,10 @@ services:
       - ./monitoring/rules:/etc/prometheus/rules:ro
       - prom_data:/prometheus
     ports:
-      - "${PROM_PORT:-9090}:9090"
+      # 127.0.0.1 bind: --web.enable-lifecycle auth'suz oldugundan LAN'daki
+      # herkes Prometheus'u kapatabilirdi. Grafana ic agdan (http://prometheus:9090)
+      # erisir; LAN'a acmak icin PROM_BIND=0.0.0.0 yapin.
+      - "${PROM_BIND:-127.0.0.1}:${PROM_PORT:-9090}:9090"
     depends_on:
       gateway:
         condition: service_started
@@ -113,7 +116,9 @@ services:
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
       GF_USERS_ALLOW_SIGN_UP: "false"
-      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      # LAN kurulumunda anonim erisim varsayilan KAPALI; demo icin
+      # GRAFANA_ANONYMOUS=true ile acilabilir.
+      GF_AUTH_ANONYMOUS_ENABLED: ${GRAFANA_ANONYMOUS:-false}
       GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
     volumes:
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro

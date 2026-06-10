@@ -49,6 +49,21 @@ class ChatResponse(_Base):
     prompt_eval_count: int | None = None
 
 
+class UserCreateRequest(_Base):
+    username: str = Field(..., min_length=3, max_length=32, pattern=r"^[a-zA-Z0-9._\-]+$")
+    password: str = Field(..., min_length=6, max_length=256)
+    department: str = Field(..., min_length=1, max_length=64)
+    role: str = Field(default="user", pattern="^(user|admin)$")
+    label: str | None = Field(default=None, max_length=128)
+
+
+class UserUpdateRequest(_Base):
+    department: str | None = Field(default=None, min_length=1, max_length=64)
+    role: str | None = Field(default=None, pattern="^(user|admin)$")
+    label: str | None = Field(default=None, max_length=128)
+    new_password: str | None = Field(default=None, min_length=6, max_length=256)
+
+
 class PasswordChangeRequest(_Base):
     current_password: str = Field(..., min_length=1, max_length=256)
     new_password: str = Field(..., min_length=8, max_length=256)
