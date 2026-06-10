@@ -77,7 +77,7 @@
         <div class="meta">
           <span class="badge plain">~${m.approx_gb} GB</span>
           <span class="badge plain">${escapeHtml(m.tier)}</span>
-          ${fits ? '<span class="badge ok">butceye sigar</span>' : '<span class="badge warn">butce yetersiz</span>'}
+          ${fits ? '<span class="badge ok">bellege sigar</span>' : '<span class="badge warn">bellek yetersiz</span>'}
           ${srcBadge}
           ${recBadge}
         </div>
