@@ -1,15 +1,16 @@
 """Sistem kaynak monitoru.
 
-Iki kaynak:
+Uc kaynak:
   - Container icinden gozuken host processes (psutil)
   - Docker daemon'dan tum container'larin CPU/mem stats (DOCKER_HOST varsa)
+  - NVIDIA GPU canli metrikleri (pynvml; yoksa nvidia-smi; o da yoksa bos)
 """
 
 from __future__ import annotations
 
-import json
 import logging
 import os
+import shutil
 import subprocess
 from typing import Any
 
@@ -97,7 +98,109 @@ def docker_stats() -> list[dict[str, Any]]:
     return rows
 
 
-def actions_for_state(host: dict[str, Any], top: list[dict[str, Any]]) -> list[dict[str, str]]:
+def _gpu_stats_pynvml() -> list[dict[str, Any]] | None:
+    try:
+        import pynvml  # type: ignore
+    except ImportError:
+        return None
+    try:
+        pynvml.nvmlInit()
+    except Exception:
+        return None
+    gpus: list[dict[str, Any]] = []
+    try:
+        for i in range(pynvml.nvmlDeviceGetCount()):
+            handle = pynvml.nvmlDeviceGetHandleByIndex(i)
+            name = pynvml.nvmlDeviceGetName(handle)
+            if isinstance(name, bytes):
+                name = name.decode("utf-8", errors="replace")
+            mem = pynvml.nvmlDeviceGetMemoryInfo(handle)
+            gpu: dict[str, Any] = {
+                "index": i,
+                "name": str(name),
+                "vram_total_gb": round(mem.total / 1024**3, 2),
+                "vram_used_gb": round(mem.used / 1024**3, 2),
+                "vram_percent": round(mem.used / mem.total * 100, 1) if mem.total else 0.0,
+            }
+            try:
+                util = pynvml.nvmlDeviceGetUtilizationRates(handle)
+                gpu["util_percent"] = float(util.gpu)
+            except Exception:
+                gpu["util_percent"] = None
+            try:
+                gpu["temperature_c"] = int(
+                    pynvml.nvmlDeviceGetTemperature(handle, pynvml.NVML_TEMPERATURE_GPU)
+                )
+            except Exception:
+                gpu["temperature_c"] = None
+            try:
+                gpu["power_w"] = round(pynvml.nvmlDeviceGetPowerUsage(handle) / 1000.0, 1)
+            except Exception:
+                gpu["power_w"] = None
+            gpus.append(gpu)
+    finally:
+        try:
+            pynvml.nvmlShutdown()
+        except Exception:
+            pass
+    return gpus or None
+
+
+def _gpu_stats_smi() -> list[dict[str, Any]] | None:
+    if not shutil.which("nvidia-smi"):
+        return None
+    try:
+        out = subprocess.check_output(
+            [
+                "nvidia-smi",
+                "--query-gpu=index,name,utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw",
+                "--format=csv,noheader,nounits",
+            ],
+            timeout=5,
+            stderr=subprocess.DEVNULL,
+        ).decode("utf-8")
+    except (subprocess.SubprocessError, OSError):
+        return None
+
+    def _num(v: str) -> float | None:
+        try:
+            return float(v)
+        except ValueError:
+            return None
+
+    gpus: list[dict[str, Any]] = []
+    for line in out.strip().splitlines():
+        parts = [p.strip() for p in line.split(",")]
+        if len(parts) < 7:
+            continue
+        used_mb, total_mb = _num(parts[3]), _num(parts[4])
+        gpus.append({
+            "index": int(parts[0]) if parts[0].isdigit() else 0,
+            "name": parts[1],
+            "util_percent": _num(parts[2]),
+            "vram_used_gb": round(used_mb / 1024, 2) if used_mb is not None else None,
+            "vram_total_gb": round(total_mb / 1024, 2) if total_mb is not None else None,
+            "vram_percent": round(used_mb / total_mb * 100, 1) if used_mb and total_mb else 0.0,
+            "temperature_c": int(_num(parts[5])) if _num(parts[5]) is not None else None,
+            "power_w": _num(parts[6]),
+        })
+    return gpus or None
+
+
+def gpu_stats() -> list[dict[str, Any]]:
+    """Canli GPU metrikleri — GPU yoksa veya erisilemiyorsa bos liste."""
+    try:
+        return _gpu_stats_pynvml() or _gpu_stats_smi() or []
+    except Exception as exc:
+        log.debug("GPU stats alinamadi: %s", exc)
+        return []
+
+
+def actions_for_state(
+    host: dict[str, Any],
+    top: list[dict[str, Any]],
+    gpus: list[dict[str, Any]] | None = None,
+) -> list[dict[str, str]]:
     """Mevcut duruma gore otomatik oneriler."""
     actions: list[dict[str, str]] = []
     if host["memory_percent"] > 85:
@@ -121,6 +224,22 @@ def actions_for_state(host: dict[str, Any], top: list[dict[str, Any]]) -> list[d
             "title": "Disk %90'dan dolu",
             "detail": "Yeni model indirilemeyebilir. Eski modelleri silin veya disk acin.",
         })
+    for g in gpus or []:
+        label = f"GPU {g.get('index', 0)} ({g.get('name', '?')})"
+        if (g.get("vram_percent") or 0) > 90:
+            actions.append({
+                "severity": "warn",
+                "title": f"{label}: VRAM %90'in uzerinde",
+                "detail": "Daha kucuk bir model secin veya idle unload suresini kisaltin; "
+                          "yeni model yuklemesi OOM ile basarisiz olabilir.",
+            })
+        temp = g.get("temperature_c")
+        if temp is not None and temp >= 85:
+            actions.append({
+                "severity": "warn",
+                "title": f"{label}: sicaklik {temp}°C",
+                "detail": "GPU asiri isiniyor — sogutmayi kontrol edin, surekli yuk altinda throttling baslayabilir.",
+            })
     return actions
 
 
@@ -128,10 +247,12 @@ def snapshot() -> dict[str, Any]:
     host = host_summary()
     top_cpu = top_processes(n=8, sort_by="cpu")
     top_mem = top_processes(n=8, sort_by="memory")
+    gpus = gpu_stats()
     return {
         "host": host,
+        "gpus": gpus,
         "top_cpu": top_cpu,
         "top_mem": top_mem,
         "containers": docker_stats(),
-        "actions": actions_for_state(host, top_mem),
+        "actions": actions_for_state(host, top_mem, gpus),
     }

@@ -2,6 +2,19 @@
 
 Tum dikkat ceken degisiklikler bu dosyada listelenir. Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardina yakindir.
 
+## [0.7.1] - 2026-06-10
+
+### Added
+- **Canli GPU izleme** — Kaynaklar sayfasinda GPU basina VRAM kullanimi, GPU yuku, sicaklik ve guc karti (pynvml; yoksa nvidia-smi); VRAM > %90 ve sicaklik >= 85°C icin otomatik aksiyon onerileri; GPU yoksa bolum gizli kalir
+- **GPU overlay genisletildi** — `docker-compose.gpu.yml` artik gateway'e de GPU erisimi verir (dogru donanim tier'i + canli metrikler)
+- **Cloud modeller kesifte** — DeepSeek-V4, Kimi-K2.x, GLM-5.x gibi yalnizca Ollama Cloud modelleri "☁ cloud" rozetiyle listelenir (on-prem kurulamaz, veri disari cikar uyarisiyla)
+- **Katalog 2026 Q2 yenilemesi** — 59 model: Gemma 4 (5 boyut), Qwen3.5 (0.8B-122B), Qwen3.6, Granite 4.1, Nemotron 3 + Cascade-2, Mistral Medium 3.5, LFM2.5
+- **Login guvenilirligi** — DEMO_MODE'da demo parolalar her acilista tabloya esitlenir; tikla-doldur demo tablosu; kullanici adi trim
+
+### Changed
+- Kullaniciya gorunen "butce" ifadeleri "bellek butcesi / bellege sigar" olarak netlestirildi
+- Canli kesif istemcisi tam listeyi ceker (limit=1000) — tum modeller aranabilir
+
 ## [0.7.0] - 2026-06-10
 
 KVKK uyum paketi + UX olgunlasmasi + mimari sadelestiriilme (anahtar teslim surumu).

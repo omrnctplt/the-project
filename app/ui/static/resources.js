@@ -58,6 +58,9 @@
     document.getElementById("vDiskSub").textContent = fmtNumber(h.disk_percent, 1) + " % dolu · " + fmtNumber(h.disk_free_gb, 1) + " GB bos";
     barColor("statDisk", "vDiskBar", h.disk_percent || 0);
 
+    // GPU'lar (varsa)
+    renderGpus(d.gpus || []);
+
     // Actions
     const actDiv = document.getElementById("actionList");
     actDiv.innerHTML = "";
@@ -104,6 +107,34 @@
       tr.innerHTML = `<td>${escapeHtml(p.name)}</td><td>${p.pid}</td><td>${escapeHtml(p.user || "")}</td><td>${p.memory_percent} %</td><td>${fmtBytes(p.memory_mb)}</td>`;
       tbMem.appendChild(tr);
     }
+  }
+
+  function renderGpus(gpus) {
+    const sec = document.getElementById("gpuSection");
+    if (!sec) return;
+    if (!gpus.length) { sec.style.display = "none"; return; }
+    sec.style.display = "";
+    sec.innerHTML = gpus.map(g => {
+      const vramPct = g.vram_percent || 0;
+      const utilPct = g.util_percent;
+      const cls = vramPct > 90 ? "error" : vramPct > 75 ? "warn" : "ok";
+      const subBits = [];
+      if (utilPct != null) subBits.push(`kullanim %${fmtNumber(utilPct, 0)}`);
+      if (g.temperature_c != null) subBits.push(`${g.temperature_c}°C`);
+      if (g.power_w != null) subBits.push(`${fmtNumber(g.power_w, 0)} W`);
+      return `
+      <div class="stat ${cls}">
+        <div class="stat-label">GPU ${g.index} · ${escapeHtml(g.name || "?")}</div>
+        <div class="stat-value">${fmtNumber(g.vram_used_gb, 1)} / ${fmtNumber(g.vram_total_gb, 1)} GB</div>
+        <div class="stat-sub">VRAM %${fmtNumber(vramPct, 1)}${subBits.length ? " · " + subBits.join(" · ") : ""}</div>
+        <div class="progress ${vramPct > 90 ? "error" : vramPct > 75 ? "warn" : ""}" style="margin-top:0.6rem;">
+          <div class="bar" style="width:${Math.min(100, vramPct)}%"></div>
+        </div>
+        ${utilPct != null ? `
+        <div class="muted" style="font-size:0.7rem; margin-top:0.45rem; display:flex; justify-content:space-between;"><span>GPU kullanimi</span><span>%${fmtNumber(utilPct, 0)}</span></div>
+        <div class="progress" style="margin-top:0.2rem;"><div class="bar" style="width:${Math.min(100, utilPct)}%"></div></div>` : ""}
+      </div>`;
+    }).join("");
   }
 
   function barColor(statId, barId, pct) {
