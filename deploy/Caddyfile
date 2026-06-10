@@ -1,0 +1,23 @@
+# Inference Hub — TLS sonlandirma (sirket ici LAN)
+#
+# "tls internal": Caddy kendi yerel CA'siyla sertifika uretir. Calisan
+# tarayicilari ilk girişte uyari gosterir; BT ekibi Caddy'nin kok
+# sertifikasini (container icinde /data/caddy/pki/authorities/local/root.crt)
+# sirket makinelerine dagitirsa uyari kalkar.
+#
+# Gercek bir dahili alan adi + sirket CA'si varsa "tls internal" satirini
+# "tls /certs/cert.pem /certs/key.pem" ile degistirin.
+
+{
+	admin off
+}
+
+https://:443 {
+	tls internal
+	reverse_proxy gateway:8080
+}
+
+# HTTP -> HTTPS yonlendirme
+http://:80 {
+	redir https://{host}{uri} permanent
+}

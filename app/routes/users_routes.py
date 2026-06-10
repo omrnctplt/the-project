@@ -4,12 +4,18 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from .. import audit, auth, usage
-from ..models import UsageSummary
+from ..deps import get_state
+from ..models import UsageSummary, UserCreateRequest, UserUpdateRequest
 
 router = APIRouter()
+
+
+def _valid_departments(request: Request) -> set[str]:
+    state = get_state(request)
+    return set(((state.catalog or {}).get("departments") or {}).keys())
 
 
 @router.get("/api/v1/usage/me", response_model=UsageSummary)
@@ -46,6 +52,64 @@ async def audit_log(
 @router.get("/api/v1/users")
 async def users(_=Depends(auth.require_admin)) -> dict[str, Any]:
     return {"users": auth.list_users()}
+
+
+@router.post("/api/v1/users", status_code=201)
+async def create_user(
+    body: UserCreateRequest,
+    request: Request,
+    principal: dict[str, Any] = Depends(auth.require_admin),
+) -> dict[str, Any]:
+    """Yeni calisan hesabi olusturur (admin). Departman katalogdan dogrulanir."""
+    valid = _valid_departments(request)
+    if valid and body.department not in valid:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Bilinmeyen departman: {body.department}. Gecerli: {', '.join(sorted(valid))}",
+        )
+    if not auth.create_user(
+        body.username, body.password, body.department, body.role, body.label
+    ):
+        raise HTTPException(status_code=409, detail=f"Kullanici zaten var: {body.username}")
+    audit.write(
+        username=principal["username"], department=principal["department"],
+        prompt=f"user_create:{body.username}", model_id=None, category=None,
+        matched_rule="user_create", fallback=False, status="ok", latency_ms=None,
+    )
+    return {"status": "created", "username": body.username}
+
+
+@router.put("/api/v1/users/{username}")
+async def update_user(
+    username: str,
+    body: UserUpdateRequest,
+    request: Request,
+    principal: dict[str, Any] = Depends(auth.require_admin),
+) -> dict[str, Any]:
+    """Departman/rol/etiket gunceller; new_password verilirse sifre sifirlar (admin)."""
+    if not auth.get_user(username):
+        raise HTTPException(status_code=404, detail="Kullanici bulunamadi")
+    if username == principal["username"] and body.role == "user":
+        raise HTTPException(status_code=400, detail="Kendi admin yetkinizi kaldiramazsiniz")
+    if body.department is not None:
+        valid = _valid_departments(request)
+        if valid and body.department not in valid:
+            raise HTTPException(status_code=400, detail=f"Bilinmeyen departman: {body.department}")
+    changed = []
+    if any(v is not None for v in (body.department, body.role, body.label)):
+        auth.update_user(username, department=body.department, role=body.role, label=body.label)
+        changed.append("profil")
+    if body.new_password:
+        auth.change_password(username, body.new_password)
+        changed.append("sifre")
+    if not changed:
+        raise HTTPException(status_code=400, detail="Guncellenecek alan verilmedi")
+    audit.write(
+        username=principal["username"], department=principal["department"],
+        prompt=f"user_update:{username}:{'+'.join(changed)}", model_id=None, category=None,
+        matched_rule="user_update", fallback=False, status="ok", latency_ms=None,
+    )
+    return {"status": "updated", "username": username, "changed": changed}
 
 
 @router.delete("/api/v1/users/{username}/data")

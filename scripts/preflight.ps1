@@ -26,6 +26,18 @@ if (Select-String -Path .env -Pattern 'JWT_SECRET=(lutfen-bu-degeri|demo-only)' 
     Warn "JWT_SECRET hala demo degerinde - uretim ortaminda degistirin"
 }
 
+# Uretim/LAN kontrolu: bilinen-parolali demo hesaplar + zayif admin parolasi
+if (-not (Select-String -Path .env -Pattern '^DEMO_MODE=false' -Quiet)) {
+    Warn "DEMO_MODE kapali degil - demo hesap parolalari README'de YAYINLI."
+    Write-Host "    Sirket aginda kurulumdan once .env'e DEMO_MODE=false ekleyin."
+}
+$apLine = Select-String -Path .env -Pattern '^ADMIN_PASSWORD=(.*)$' | Select-Object -Last 1
+$apVal = ""
+if ($apLine) { $apVal = $apLine.Matches[0].Groups[1].Value.Trim() }
+if (-not $apVal -or $apVal -eq 'admin') {
+    Warn "ADMIN_PASSWORD varsayilanda (admin) - LAN kurulumunda guclu bir parola verin."
+}
+
 # 2) Docker daemon
 Hdr "Docker daemon"
 $dockerCmd = Get-Command docker -ErrorAction SilentlyContinue

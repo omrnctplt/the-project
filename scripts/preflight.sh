@@ -31,6 +31,15 @@ if grep -qE "^JWT_SECRET=(lutfen-bu-degeri|demo-only)" .env; then
   warn "JWT_SECRET hala demo degerinde — uretim ortaminda mutlaka degistirin"
 fi
 
+# Uretim/LAN kontrolu: bilinen-parolali demo hesaplar + zayif admin parolasi
+if ! grep -qE "^DEMO_MODE=false" .env 2>/dev/null; then
+  warn "DEMO_MODE kapali degil — demo hesap parolalari README'de YAYINLI."
+  echo "    Sirket aginda kurulumdan once .env'e DEMO_MODE=false ekleyin."
+fi
+if ! grep -qE "^ADMIN_PASSWORD=.+" .env 2>/dev/null || grep -qE "^ADMIN_PASSWORD=admin$" .env 2>/dev/null; then
+  warn "ADMIN_PASSWORD varsayilanda (admin) — LAN kurulumunda guclu bir parola verin."
+fi
+
 # 2) Docker daemon
 hdr "Docker daemon"
 if ! command -v docker >/dev/null 2>&1; then

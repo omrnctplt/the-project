@@ -1,0 +1,30 @@
+# TLS overlay — gateway'i HTTPS arkasina alir (sirket LAN'i icin onerilir).
+#
+#   docker compose -f docker-compose.yml -f docker-compose.tls.yml up -d --build
+#
+# Calisanlar https://<sunucu-ip> ile baglanir; JWT ve parolalar agda
+# sifreli tasinir. Gateway'in kendi portu yalnizca localhost'a alinir.
+
+services:
+  gateway:
+    ports: !override
+      - "127.0.0.1:${GATEWAY_PORT:-8080}:8080"
+
+  caddy:
+    image: caddy:2.9
+    container_name: onprem-ai-caddy
+    restart: unless-stopped
+    ports:
+      - "443:443"
+      - "80:80"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    depends_on:
+      gateway:
+        condition: service_healthy
+    mem_limit: 128m
+    networks: [onprem]
+
+volumes:
+  caddy_data:

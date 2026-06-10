@@ -38,22 +38,137 @@
     }
   });
 
-  // --- Users ---
-  try {
-    const u = await api("/api/v1/users");
-    const tb = document.querySelector("#usersTable tbody");
-    tb.innerHTML = "";
-    for (const row of (u.users || [])) {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${escapeHtml(row.username)}</td>
-        <td>${escapeHtml(row.department)}</td>
-        <td><span class="badge plain">${escapeHtml(row.role)}</span></td>
-        <td>${escapeHtml(row.label || "—")}</td>
-        <td class="muted">${row.last_login_at ? row.last_login_at.replace("T", " ").slice(0, 19) : "—"}</td>`;
-      tb.appendChild(tr);
+  // --- Users (tam yonetim: olustur / sifre sifirla / duzenle / sil) ---
+  let _departments = [];
+
+  async function loadUsersTab() {
+    try {
+      try {
+        const cat = await api("/api/v1/system/catalog");
+        _departments = Object.keys(cat.departments || {});
+      } catch { _departments = []; }
+      const u = await api("/api/v1/users");
+      const tb = document.querySelector("#usersTable tbody");
+      tb.innerHTML = "";
+      const me = (window.currentUser || {}).username;
+      for (const row of (u.users || [])) {
+        const tr = document.createElement("tr");
+        const isSelf = row.username === me;
+        const isAdminRow = row.role === "admin";
+        tr.innerHTML = `
+          <td>${escapeHtml(row.username)}${isSelf ? ' <span class="muted">(siz)</span>' : ""}</td>
+          <td>${escapeHtml(row.department)}</td>
+          <td><span class="badge ${isAdminRow ? "ok" : "plain"}">${escapeHtml(row.role)}</span></td>
+          <td>${escapeHtml(row.label || "—")}</td>
+          <td class="muted">${row.last_login_at ? row.last_login_at.replace("T", " ").slice(0, 19) : "—"}</td>
+          <td style="white-space:nowrap;">
+            <button class="small" data-uact="edit" data-u="${escapeHtml(row.username)}" title="Departman/rol duzenle">Duzenle</button>
+            <button class="small" data-uact="pw" data-u="${escapeHtml(row.username)}" title="Sifre sifirla">Sifre</button>
+            ${!isAdminRow ? `<button class="small danger" data-uact="del" data-u="${escapeHtml(row.username)}" title="Hesabi sil (KVKK: tum verisiyle)">Sil</button>` : ""}
+          </td>`;
+        tb.appendChild(tr);
+      }
+    } catch (e) { console.error(e); }
+  }
+
+  function deptOptions(selected) {
+    const opts = (_departments.length ? _departments : ["general"]).map(d =>
+      `<option value="${escapeHtml(d)}" ${d === selected ? "selected" : ""}>${escapeHtml(d)}</option>`).join("");
+    return opts;
+  }
+
+  const newUserBtn = document.getElementById("newUserBtn");
+  if (newUserBtn) {
+    newUserBtn.onclick = () => {
+      modal({
+        title: "Yeni calisan hesabi",
+        body: `
+          <label>Kullanici adi <input id="nu_user" placeholder="orn: ahmet.yilmaz" autocomplete="off" /></label>
+          <label>Gecici sifre (en az 6 karakter) <input id="nu_pass" type="text" autocomplete="off" /></label>
+          <label>Departman <select id="nu_dept">${deptOptions("general")}</select></label>
+          <label>Rol <select id="nu_role"><option value="user">Kullanici</option><option value="admin">Yonetici</option></select></label>
+          <label>Etiket (gorunen ad) <input id="nu_label" placeholder="orn: Ahmet Yilmaz" /></label>
+          <p class="muted" style="font-size:0.78rem;">Calisana kullanici adi + gecici sifreyi iletin; ilk giriste "Sifre degistir" ile kendi sifresini belirlemesini isteyin.</p>
+        `,
+        primary: "Olustur",
+        onPrimary: async () => {
+          const body = {
+            username: document.getElementById("nu_user").value.trim(),
+            password: document.getElementById("nu_pass").value,
+            department: document.getElementById("nu_dept").value,
+            role: document.getElementById("nu_role").value,
+            label: document.getElementById("nu_label").value.trim() || null,
+          };
+          if (!body.username || body.password.length < 6) {
+            toast("Kullanici adi + en az 6 karakterli sifre gerekli", "warn"); return;
+          }
+          try {
+            await api("/api/v1/users", { method: "POST", body: JSON.stringify(body) });
+            toast(`Hesap olusturuldu: ${body.username}`, "ok");
+            loadUsersTab();
+          } catch (e) { toast("Olusturulamadi: " + e.message, "error", 5000); }
+        },
+      });
+    };
+  }
+
+  document.querySelector("#usersTable").addEventListener("click", async (e) => {
+    const btn = e.target.closest("button[data-uact]");
+    if (!btn) return;
+    const username = btn.dataset.u;
+    const act = btn.dataset.uact;
+    if (act === "pw") {
+      modal({
+        title: `Sifre sifirla — ${username}`,
+        body: `<label>Yeni gecici sifre (en az 6 karakter) <input id="rp_pass" type="text" autocomplete="off" /></label>`,
+        primary: "Sifirla",
+        onPrimary: async () => {
+          const pw = document.getElementById("rp_pass").value;
+          if (pw.length < 6) { toast("En az 6 karakter", "warn"); return; }
+          try {
+            await api(`/api/v1/users/${encodeURIComponent(username)}`, {
+              method: "PUT", body: JSON.stringify({ new_password: pw }),
+            });
+            toast("Sifre sifirlandi", "ok");
+          } catch (err) { toast("Hata: " + err.message, "error", 5000); }
+        },
+      });
+    } else if (act === "edit") {
+      modal({
+        title: `Duzenle — ${username}`,
+        body: `
+          <label>Departman <select id="eu_dept">${deptOptions("")}</select></label>
+          <label>Rol <select id="eu_role"><option value="user">Kullanici</option><option value="admin">Yonetici</option></select></label>
+          <label>Etiket <input id="eu_label" placeholder="(degistirmemek icin bos birak)" /></label>
+        `,
+        primary: "Kaydet",
+        onPrimary: async () => {
+          const body = {
+            department: document.getElementById("eu_dept").value,
+            role: document.getElementById("eu_role").value,
+          };
+          const lbl = document.getElementById("eu_label").value.trim();
+          if (lbl) body.label = lbl;
+          try {
+            await api(`/api/v1/users/${encodeURIComponent(username)}`, {
+              method: "PUT", body: JSON.stringify(body),
+            });
+            toast("Guncellendi — kullanici yeniden giris yapinca gecerli olur", "ok", 4500);
+            loadUsersTab();
+          } catch (err) { toast("Hata: " + err.message, "error", 5000); }
+        },
+      });
+    } else if (act === "del") {
+      if (!confirm(`'${username}' hesabi ve TUM kisisel verisi (KVKK) silinsin mi? Geri alinamaz.`)) return;
+      try {
+        await api(`/api/v1/users/${encodeURIComponent(username)}`, { method: "DELETE" });
+        toast("Hesap silindi", "ok");
+        loadUsersTab();
+      } catch (err) { toast("Hata: " + err.message, "error", 5000); }
     }
-  } catch (e) { console.error(e); }
+  });
+
+  loadUsersTab();
 
   // --- Usage ---
   try {

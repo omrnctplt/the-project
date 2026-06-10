@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -11,7 +12,7 @@ from ..models import LoginRequest, PasswordChangeRequest, TokenResponse
 
 router = APIRouter()
 
-LOGIN_RATE_PER_MIN = 10
+LOGIN_RATE_PER_MIN = int(os.getenv("LOGIN_RATE_PER_MIN", "10"))
 
 
 @router.post("/login", response_model=TokenResponse)

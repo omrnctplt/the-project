@@ -163,8 +163,11 @@ def test_cannot_delete_self_or_admin(client):
     assert client.delete("/api/v1/users/admin", headers={"Authorization": f"Bearer {token}"}).status_code == 400
 
 
-def test_login_rate_limited(client):
-    for _ in range(10):
+def test_login_rate_limited(client, monkeypatch):
+    # Limiti sabitle: ortam degiskeninden bagimsiz, deterministik dogrulama
+    from app.routes import auth_routes
+    monkeypatch.setattr(auth_routes, "LOGIN_RATE_PER_MIN", 3)
+    for _ in range(3):
         client.post("/login", json={"username": "olmayan_xyz", "password": "yanlis"})
     r = client.post("/login", json={"username": "olmayan_xyz", "password": "yanlis"})
     assert r.status_code == 429

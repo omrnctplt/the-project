@@ -240,3 +240,61 @@ def delete_user(username: str) -> bool:
         cur = conn.execute("DELETE FROM users WHERE username = ?", (username,))
         conn.commit()
         return cur.rowcount > 0
+
+
+def create_user(
+    username: str,
+    password: str,
+    department: str,
+    role: str = "user",
+    label: str | None = None,
+) -> bool:
+    """Yeni kullanici olusturur. Ayni isimde kullanici varsa False doner."""
+    with _lock, _connect() as conn:
+        _ensure_schema(conn)
+        try:
+            conn.execute(
+                "INSERT INTO users (username, password_hash, department, role, label, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    username,
+                    _hash_password(password),
+                    department,
+                    role,
+                    label,
+                    datetime.now(timezone.utc).isoformat(),
+                ),
+            )
+            conn.commit()
+        except sqlite3.IntegrityError:
+            return False
+    log.info("Kullanici olusturuldu: %s (%s/%s)", username, department, role)
+    return True
+
+
+def update_user(
+    username: str,
+    *,
+    department: str | None = None,
+    role: str | None = None,
+    label: str | None = None,
+) -> bool:
+    """Kullanicinin departman/rol/etiketini gunceller (yalnizca verilen alanlar)."""
+    sets: list[str] = []
+    params: list[Any] = []
+    if department is not None:
+        sets.append("department = ?")
+        params.append(department)
+    if role is not None:
+        sets.append("role = ?")
+        params.append(role)
+    if label is not None:
+        sets.append("label = ?")
+        params.append(label)
+    if not sets:
+        return False
+    params.append(username)
+    with _lock, _connect() as conn:
+        cur = conn.execute(f"UPDATE users SET {', '.join(sets)} WHERE username = ?", params)
+        conn.commit()
+        return cur.rowcount > 0

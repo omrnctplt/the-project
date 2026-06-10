@@ -137,6 +137,67 @@ make up
 
 ---
 
+## Sirket aginda erisim (LAN kurulumu)
+
+Sistemi sirketin sunucu odasindaki bir makineye kurdugunuzda, ayni agdaki tum
+calisanlar **tarayicidan** erisir — istemci tarafina hicbir kurulum gerekmez.
+
+### 1. Sunucuda kurulum
+
+```bash
+git clone <repo> && cd the-project
+DEMO_MODE=false ADMIN_PASSWORD='guclu-bir-parola' docker compose up -d --build
+```
+
+Gateway varsayilan olarak `0.0.0.0:8080`'i dinler — yani LAN'a aciktir.
+Ollama ise bilerek **127.0.0.1**'e baglidir: calisanlar auth/audit katmanini
+atlayip dogrudan modele erisemez.
+
+### 2. Sunucunun IP'sini bulun ve guvenlik duvarini acin
+
+```bash
+# Linux
+hostname -I                          # orn: 192.168.1.40
+sudo ufw allow 8080/tcp              # gateway (zorunlu)
+sudo ufw allow 3000/tcp 9090/tcp     # Grafana/Prometheus (istege bagli, sadece BT)
+```
+
+```powershell
+# Windows Server
+ipconfig                             # IPv4 adresi
+New-NetFirewallRule -DisplayName "Inference Hub" -Direction Inbound -LocalPort 8080 -Protocol TCP -Action Allow
+```
+
+### 3. Calisanlara hesap acin
+
+UI → **Ayarlar → Kullanicilar → + Yeni kullanici** (admin). Kullanici adi +
+gecici sifre + departman secin; calisan ilk giriste "Sifre degistir" ile kendi
+sifresini belirler. Departman, kullanicinin hangi model kategorilerine
+erisecegini ve rate limitini belirler.
+
+### 4. Calisanlar baglanir
+
+```
+http://192.168.1.40:8080        ←  tek ihtiyaclari olan adres
+```
+
+UI'daki Grafana/Prometheus linkleri otomatik olarak ayni sunucu adresine isaret
+eder (localhost'a sabitlenmez).
+
+### Guvenlik notlari (uretim)
+
+| Konu | Durum / Oneri |
+|---|---|
+| **TLS/HTTPS** | Hazir overlay var: `make up-tls` (veya `docker compose -f docker-compose.yml -f docker-compose.tls.yml up -d`). Caddy 443'te kendi ic CA'siyla TLS sonlandirir, gateway portu localhost'a alinir. Sirket CA'niz varsa `deploy/Caddyfile` icinde sertifika yolunu degistirin. |
+| `DEMO_MODE` | Uretimde mutlaka `false` — preflight artik acik unutulursa uyarir. |
+| `JWT_SECRET` | Bos birakilabilir: sistem guclu bir secret uretip `data/jwt_secret` dosyasinda kalici tutar. |
+| `ADMIN_PASSWORD` | Varsayilan `admin` — preflight zayif/eksik parolada uyarir. |
+| Prometheus (9090) | **Varsayilan localhost-only** (`--web.enable-lifecycle` auth'suz oldugundan LAN'a acilmaz). Grafana ic agdan erisir; gerekirse `PROM_BIND=0.0.0.0`. |
+| Grafana (3000) | Anonim erisim **varsayilan kapali** — `admin / GRAFANA_ADMIN_PASSWORD` ile girilir. Demo icin `GRAFANA_ANONYMOUS=true`. |
+| Yedekleme | `make backup` → `backups/inference-hub-data-<tarih>.tgz` (kullanici DB + audit + config). Geri yukleme: `make restore`. |
+
+---
+
 ## Mimari
 
 ```
