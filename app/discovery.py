@@ -156,13 +156,37 @@ def parse_ollama_library(page_html: str) -> list[dict[str, Any]]:
 
 
 def ollama_entries_to_models(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Ham girisleri (model x boyut) normalize edilmis item listesine acar."""
+    """Ham girisleri (model x boyut) normalize edilmis item listesine acar.
+
+    Boyut etiketi olmayan girisler ollama.com'un CLOUD modelleridir
+    (deepseek-v4, kimi-k2.6, glm-5.1 vb.) — lokal pull edilemezler ama
+    guncel gelismelerin gorunurlugu icin listede `cloud: true` ile yer alir.
+    """
     items: list[dict[str, Any]] = []
     for e in entries:
         category = guess_category(e["name"], e.get("description", ""), e.get("capabilities"))
         if category is None:
             continue
-        for size_label in e.get("sizes") or []:
+        sizes = e.get("sizes") or []
+        if not sizes:
+            items.append({
+                "key": f"ollama:{e['name']}:cloud",
+                "provider": "ollama",
+                "name": e["name"],
+                "tag": e["name"],
+                "label": e["name"].replace("-", " ").title(),
+                "blurb": e.get("description", ""),
+                "category": category,
+                "parameters_b": None,
+                "approx_gb": None,
+                "tier": None,
+                "cloud": True,
+                "popularity": e.get("pulls", 0),
+                "updated": e.get("updated"),
+                "capabilities": e.get("capabilities") or [],
+            })
+            continue
+        for size_label in sizes:
             params = parse_size_label(size_label)
             if params is None:
                 continue
@@ -178,6 +202,7 @@ def ollama_entries_to_models(entries: list[dict[str, Any]]) -> list[dict[str, An
                 "parameters_b": params,
                 "approx_gb": ram,
                 "tier": tier_for_ram(ram),
+                "cloud": False,
                 "popularity": e.get("pulls", 0),
                 "updated": e.get("updated"),
                 "capabilities": e.get("capabilities") or [],
@@ -221,6 +246,7 @@ def parse_hf_models(payload: list[dict[str, Any]]) -> list[dict[str, Any]]:
             "parameters_b": params,
             "approx_gb": ram,
             "tier": tier_for_ram(ram),
+            "cloud": False,
             "popularity": downloads,
             "updated": m.get("lastModified") or m.get("createdAt"),
             "capabilities": [],

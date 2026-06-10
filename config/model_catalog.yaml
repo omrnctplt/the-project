@@ -41,6 +41,10 @@ models:
   gemma3n-e2b: {ollama_tag: "gemma3n:e2b", category: text, parameters_b: 2.0, ram_gb: 2.0, vram_gb: 2.0, tier: edge, source: ollama, license: "Gemma", profile: "Gemma 3n — multimodal (metin/gorsel/ses), cihaz-ici."}
   qwen2.5-coder-3b: {ollama_tag: "qwen2.5-coder:3b", category: code, parameters_b: 3.1, ram_gb: 2.5, vram_gb: 2.5, tier: edge, source: ollama, license: "Apache 2.0", profile: "Hizli kod tamamlama, snippet."}
   deepseek-r1-1.5b: {ollama_tag: "deepseek-r1:1.5b", category: reasoning, parameters_b: 1.5, ram_gb: 1.5, vram_gb: 1.5, tier: edge, source: ollama, license: "MIT", profile: "DeepSeek-R1 distill — hafif reasoning."}
+  gemma4-e2b: {ollama_tag: "gemma4:e2b", category: text, parameters_b: 2.0, ram_gb: 1.5, vram_gb: 1.5, tier: edge, source: ollama, license: "Gemma", profile: "Gemma 4 — multimodal (gorsel/ses) + thinking, cihaz-ici."}
+  gemma4-e4b: {ollama_tag: "gemma4:e4b", category: text, parameters_b: 4.0, ram_gb: 3.0, vram_gb: 3.0, tier: edge, source: ollama, license: "Gemma", profile: "Gemma 4 — her boyutta frontier hedefli, multimodal."}
+  qwen3.5-0.8b: {ollama_tag: "qwen3.5:0.8b", category: fallback, parameters_b: 0.8, ram_gb: 0.7, vram_gb: 0.7, tier: edge, source: ollama, license: "Apache 2.0", profile: "Qwen3.5 ultra-hafif — en yeni nesil yedek."}
+  qwen3.5-4b: {ollama_tag: "qwen3.5:4b", category: text, parameters_b: 4.0, ram_gb: 3.0, vram_gb: 3.0, tier: edge, source: ollama, license: "Apache 2.0", profile: "Qwen3.5 — multimodal + thinking, gunluk kullanim."}
 
   # ==================== LAPTOP (4-16 GB) ====================
   mistral-7b: {ollama_tag: "mistral:7b", category: text, parameters_b: 7.2, ram_gb: 4.8, vram_gb: 4.8, tier: laptop, source: ollama, license: "Apache 2.0", profile: "Mistral 7B — klasik dengeli, multilingual."}
@@ -57,6 +61,10 @@ models:
   gpt-oss-20b: {ollama_tag: "gpt-oss:20b", category: reasoning, parameters_b: 20.0, ram_gb: 14.0, vram_gb: 14.0, tier: laptop, source: ollama, license: "Apache 2.0", profile: "OpenAI gpt-oss 20B — ayarlanabilir reasoning (~o3-mini)."}
   dolphin3-8b: {ollama_tag: "dolphin3:8b", category: persona, parameters_b: 8.0, ram_gb: 5.5, vram_gb: 5.5, tier: laptop, source: ollama, license: "Llama 3.1", profile: "Dolphin 3 — yonlendirilebilir persona / rol yapma."}
   hermes3-8b: {ollama_tag: "hermes3:8b", category: persona, parameters_b: 8.0, ram_gb: 5.5, vram_gb: 5.5, tier: laptop, source: ollama, license: "Llama 3.1", profile: "Nous Hermes 3 — uzun diyalog, karakter tutarliligi."}
+  gemma4-12b: {ollama_tag: "gemma4:12b", category: text, parameters_b: 12.0, ram_gb: 8.4, vram_gb: 8.4, tier: laptop, source: ollama, license: "Gemma", profile: "Gemma 4 12B — gorsel/ses + thinking, dengeli frontier."}
+  qwen3.5-9b: {ollama_tag: "qwen3.5:9b", category: text, parameters_b: 9.0, ram_gb: 6.3, vram_gb: 6.3, tier: laptop, source: ollama, license: "Apache 2.0", profile: "Qwen3.5 9B — en yeni nesil, multimodal + thinking."}
+  granite4.1-8b: {ollama_tag: "granite4.1:8b", category: text, parameters_b: 8.0, ram_gb: 5.6, vram_gb: 5.6, tier: laptop, source: ollama, license: "Apache 2.0", profile: "IBM Granite 4.1 — kurumsal RAG + JSON cikti."}
+  lfm2.5-8b: {ollama_tag: "lfm2.5:8b", category: text, parameters_b: 8.0, ram_gb: 5.6, vram_gb: 5.6, tier: laptop, source: ollama, license: "LFM", profile: "LFM2.5 — tuketici donaniminda hizli, guvenilir tool calling."}
 
   # ==================== WORKSTATION (16-48 GB) ====================
   qwen3-30b-a3b: {ollama_tag: "qwen3:30b", category: text, parameters_b: 30.0, ram_gb: 20.0, vram_gb: 20.0, tier: workstation, source: ollama, license: "Apache 2.0", profile: "Qwen3 30B-A3B (MoE) — dengeli, verimli."}
@@ -67,6 +75,14 @@ models:
   mixtral-8x7b: {ollama_tag: "mixtral:8x7b", category: text, parameters_b: 47.0, ram_gb: 26.0, vram_gb: 26.0, tier: workstation, source: ollama, license: "Apache 2.0", profile: "Mistral Mixtral 8x7B (MoE) — verimli buyuk model."}
   llama3.3-70b: {ollama_tag: "llama3.3:70b", category: text, parameters_b: 70.0, ram_gb: 43.0, vram_gb: 43.0, tier: workstation, source: ollama, license: "Llama 3.3", profile: "Llama 3.3 70B — 405B kalitesi, agir donanim."}
   dolphin-mixtral-8x7b: {ollama_tag: "dolphin-mixtral:8x7b", category: persona, parameters_b: 47.0, ram_gb: 26.0, vram_gb: 26.0, tier: workstation, source: ollama, license: "Apache 2.0", profile: "Dolphin Mixtral — guclu persona / yaratici diyalog."}
+  gemma4-26b: {ollama_tag: "gemma4:26b", category: text, parameters_b: 26.0, ram_gb: 16.9, vram_gb: 16.9, tier: workstation, source: ollama, license: "Gemma", profile: "Gemma 4 26B — frontier sinifi, multimodal + thinking."}
+  gemma4-31b: {ollama_tag: "gemma4:31b", category: text, parameters_b: 31.0, ram_gb: 20.2, vram_gb: 20.2, tier: workstation, source: ollama, license: "Gemma", profile: "Gemma 4 31B — ailenin en guclusu, gorsel/ses/thinking."}
+  qwen3.5-27b: {ollama_tag: "qwen3.5:27b", category: text, parameters_b: 27.0, ram_gb: 17.6, vram_gb: 17.6, tier: workstation, source: ollama, license: "Apache 2.0", profile: "Qwen3.5 27B — yuksek kalite genel amac, multimodal."}
+  qwen3.6-27b: {ollama_tag: "qwen3.6:27b", category: code, parameters_b: 27.0, ram_gb: 17.6, vram_gb: 17.6, tier: workstation, source: ollama, license: "Apache 2.0", profile: "Qwen3.6 27B — agentic coding'de buyuk sicrama."}
+  qwen3.6-35b: {ollama_tag: "qwen3.6:35b", category: reasoning, parameters_b: 35.0, ram_gb: 22.8, vram_gb: 22.8, tier: workstation, source: ollama, license: "Apache 2.0", profile: "Qwen3.6 35B — gelismis thinking / cok adimli akil yurutme."}
+  granite4.1-30b: {ollama_tag: "granite4.1:30b", category: text, parameters_b: 30.0, ram_gb: 19.5, vram_gb: 19.5, tier: workstation, source: ollama, license: "Apache 2.0", profile: "IBM Granite 4.1 30B — kurumsal sinif, yapilandirilmis cikti."}
+  nemotron3-33b: {ollama_tag: "nemotron3:33b", category: text, parameters_b: 33.0, ram_gb: 21.5, vram_gb: 21.5, tier: workstation, source: ollama, license: "NVIDIA Open Model", profile: "Nemotron 3 — video/ses/gorsel/metin birlesik anlama."}
+  nemotron-cascade-2-30b: {ollama_tag: "nemotron-cascade-2:30b", category: reasoning, parameters_b: 30.0, ram_gb: 19.5, vram_gb: 19.5, tier: workstation, source: ollama, license: "NVIDIA Open Model", profile: "Nemotron Cascade 2 (MoE, 3B aktif) — verimli reasoning/agentic."}
 
   # ==================== DATACENTER (48 GB+, H100/H200) ====================
   llama4-scout: {ollama_tag: "llama4:scout", category: text, parameters_b: 109.0, ram_gb: 55.0, vram_gb: 55.0, tier: datacenter, source: ollama, license: "Llama 4", profile: "Llama 4 Scout (MoE 17B aktif) — 10M context, multimodal."}
@@ -74,6 +90,8 @@ models:
   qwen3-235b: {ollama_tag: "qwen3:235b", category: reasoning, parameters_b: 235.0, ram_gb: 140.0, vram_gb: 140.0, tier: datacenter, source: ollama, license: "Apache 2.0", profile: "Qwen3 235B (MoE) — frontier reasoning, AIME lideri."}
   deepseek-v3: {ollama_tag: "deepseek-v3", category: text, parameters_b: 671.0, ram_gb: 400.0, vram_gb: 400.0, tier: datacenter, source: ollama, license: "MIT", profile: "DeepSeek-V3.2 (671B MoE, 37B aktif) — en iyi genel acik model."}
   deepseek-r1-671b: {ollama_tag: "deepseek-r1:671b", category: reasoning, parameters_b: 671.0, ram_gb: 400.0, vram_gb: 400.0, tier: datacenter, source: ollama, license: "MIT", profile: "DeepSeek-R1 671B — MATH-500 lideri, IMO altin."}
+  qwen3.5-122b: {ollama_tag: "qwen3.5:122b", category: text, parameters_b: 122.0, ram_gb: 73.2, vram_gb: 73.2, tier: datacenter, source: ollama, license: "Apache 2.0", profile: "Qwen3.5 122B — amiral gemisi, multimodal + thinking."}
+  mistral-medium-3.5: {ollama_tag: "mistral-medium-3.5:128b", category: text, parameters_b: 128.0, ram_gb: 76.8, vram_gb: 76.8, tier: datacenter, source: ollama, license: "Mistral", profile: "Mistral Medium 3.5 — talimat + reasoning + kod tek catida."}
   qwen2.5-coder-hf: {ollama_tag: "hf.co/bartowski/Qwen2.5-Coder-32B-Instruct-GGUF", category: code, parameters_b: 32.0, ram_gb: 22.0, vram_gb: 22.0, tier: workstation, source: huggingface, license: "Apache 2.0", profile: "HuggingFace GGUF ornegi — bartowski Qwen2.5 Coder 32B."}
 
 departments:
