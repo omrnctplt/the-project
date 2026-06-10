@@ -39,9 +39,10 @@ Kucuk ekipler icin Ollama'nin onunde duran bir yonlendirme katmani. Sistem ilk a
 - **Fallback chain:** Hedef kategoride hazir model yoksa fallback'a duser
 
 ### Model katalogu & canli kesif
-- **Canli kesif (yeni):** ollama.com kutuphanesi (~230 model, tum boyut varyantlari) + HuggingFace GGUF API'sinden guncel model listesi otomatik cekilir, 24 saat TTL ile cache'lenir — **yeni model ciktiginda UI/katalog guncellemesi gerekmez**, "Listeyi guncelle" yeterli
+- **Canli kesif:** ollama.com kutuphanesi (~230 model, tum boyut varyantlari) + HuggingFace GGUF API'sinden guncel model listesi otomatik cekilir, 24 saat TTL ile cache'lenir — **yeni model ciktiginda UI/katalog guncellemesi gerekmez**, "Listeyi guncelle" yeterli
+- **Cloud modeller de gorunur:** DeepSeek-V4, Kimi-K2.6, GLM-5.1 gibi yalnizca Ollama Cloud'da calisan modeller listede "☁ cloud" rozetiyle yer alir; on-premise kurulamayacaklari (veri disari cikar) acikca belirtilir
 - **Offline dostu:** Ag yoksa eski kopyaya, o da yoksa statik kataloga duser; on-premise ortam hic bozulmaz
-- **41 modellik statik havuz** — donanim tier'li (edge/laptop/workstation/datacenter): Qwen3, Llama 4 (Scout/Maverick), DeepSeek-V3/R1, Gemma 3, Phi-4, Mistral, Mixtral, SmolLM3, gpt-oss, Granite...
+- **59 modellik statik havuz** — donanim tier'li (edge/laptop/workstation/datacenter): **Gemma 4, Qwen3.5/3.6, Granite 4.1, Nemotron 3, Mistral Medium 3.5, LFM2.5**, Llama 4, DeepSeek-V3/R1, Phi-4, gpt-oss...
 - **Donanima gore dinamik oneri** — hem statik hem canli kesif, donanim tier'ina gore uygun modelleri one cikarir (laptop'ta kucuk, H100/H200'de dev modeller); RAM ihtiyaci parametre sayisindan otomatik tahmin edilir
 - **Tek tikla kur/kaldir:** kesif kartindan "+ Kur" katalog kaydi + indirmeyi tek adimda baslatir; "Ollama'dan sil" diski tek tikla bosaltir
 - **Persona / rol yapma** kategorisi + admin **kategori → model atamasi** (Ayarlar sayfasi)
@@ -217,7 +218,7 @@ routing_rules:
 
 ## Model katalogu
 
-`config/model_catalog.yaml` icinde 41 model tanimli (her birinde donanim `tier`'i + `source` + `license`). Aktif/pasif ayrimi profil + donanima gore otomatik; discover, donanim tier'ina gore oneri yapar (edge → laptop → workstation → datacenter).
+`config/model_catalog.yaml` icinde 59 model tanimli (her birinde donanim `tier`'i + `source` + `license`). Aktif/pasif ayrimi profil + donanima gore otomatik; discover, donanim tier'ina gore oneri yapar (edge → laptop → workstation → datacenter).
 
 ### Yeni model ekleme (uc yontem)
 
@@ -237,20 +238,23 @@ curl -X POST http://localhost:8080/api/v1/system/catalog/models \
 
 **c) YAML uzerinden:** `config/model_catalog.yaml`'a satir eklenir, container restart edilir.
 
-### Onerilen modeller (Mayis 2026)
+### Onerilen modeller (Haziran 2026)
 
 | Tag | Kategori | ~Boyut | Notlar |
 |---|---|---|---|
-| `gemma4:e2b` / `gemma4:e4b` | text | 1.8 / 3.2 GB | **Nisan 2026**, multimodal, 256K context |
-| `qwen3:0.6b` ... `qwen3:8b` | text/fallback | 0.6 - 5.5 GB | Yeni nesil multilingual |
-| `gemma3:1b` / `gemma3:4b` | text | 1.0 / 3.0 GB | Tool calling + vision |
-| `phi4-mini` (3.8B) / `phi4:14b` | reasoning | 2.8 / 9.0 GB | Microsoft STEM/reasoning |
+| `gemma4:e2b` ... `gemma4:31b` | text | 1.5 - 20 GB | **En yeni**: gorsel + ses + thinking, her boyutta frontier |
+| `qwen3.5:0.8b` ... `qwen3.5:122b` | text/fallback | 0.7 - 73 GB | Yeni nesil multimodal + thinking |
+| `qwen3.6:27b` / `qwen3.6:35b` | code/reasoning | 17.6 / 22.8 GB | Agentic coding'de sicrama |
+| `granite4.1:8b` / `:30b` | text | 5.6 / 19.5 GB | IBM kurumsal — RAG + JSON cikti |
 | `deepseek-r1:1.5b` / `7b` / `14b` | reasoning | 1.5 - 9 GB | Chain-of-thought distill |
 | `qwen2.5-coder:1.5b/3b/7b/14b` | code | 1.2 - 9 GB | Kod tamamlama / refactor |
-| `mistral:7b` / `mistral-small3.2` | text | 4.8 / 16 GB | Klasik + production-grade |
-| `llama3.3:70b-instruct-q4_K_M` | text | 42 GB | Frontier (agir donanim) |
-| `granite3.1-dense:8b` | text | 5.5 GB | IBM enterprise + tool calling |
+| `lfm2.5:8b` | text | 5.6 GB | Tuketici donaniminda hizli tool calling |
+| `nemotron-cascade-2:30b` | reasoning | 19.5 GB | MoE (3B aktif) — verimli agentic |
+| `mistral-medium-3.5:128b` | text | 77 GB | Amiral gemisi (agir donanim) |
 | `smollm2:360m` | fallback | 0.4 GB | Edge cihazlar |
+
+> `deepseek-v4-flash/pro`, `kimi-k2.6`, `glm-5.1` gibi **yalnizca Ollama Cloud**'da
+> sunulan modeller lokal pull edilemez; canli kesifte "☁ cloud" rozetiyle gorunur.
 
 ---
 

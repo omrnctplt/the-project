@@ -60,7 +60,7 @@
   async function refreshRemote(force) {
     remoteGrid.innerHTML = `<div class="muted" style="padding:0.8rem;">Guncel model listesi yukleniyor...</div>`;
     try {
-      const r = await api("/api/v1/system/discover/remote" + (force ? "?refresh=true" : ""));
+      const r = await api("/api/v1/system/discover/remote?limit=1000" + (force ? "&refresh=true" : ""));
       remote = r.models || [];
       remoteMeta = r;
       renderRemote();
@@ -108,6 +108,7 @@
       in_catalog: catalogTags.has(it.tag),
       recommended: it.recommended,
       popularity: it.popularity,
+      cloud: !!it.cloud,
       inflight: 0, total_req: 0, avg_ms: null,
       fits: it.fits,
       blurb: it.blurb,
@@ -229,7 +230,8 @@
 
   function renderCard(it) {
     const statusBadge = it.source === "discover"
-      ? (it.pulled ? '<span class="badge ok">indirilmis</span>'
+      ? (it.cloud ? '<span class="badge busy">☁ cloud</span>'
+        : it.pulled ? '<span class="badge ok">indirilmis</span>'
         : it.in_catalog ? '<span class="badge plain">katalogda</span>'
         : it.recommended ? '<span class="badge ok">donanima onerilen</span>'
         : '<span class="badge">kesfedildi</span>')
@@ -240,10 +242,13 @@
         ? `<span class="badge busy">indiriliyor %${Math.round((it.pull_progress || 0) * 100)}</span>`
         : `<span class="badge ${stateClass(it.status)}">${it.status}</span>`)
       : "";
-    const fitsBadge = it.fits
+    const fitsBadge = it.cloud ? ""
+      : it.fits
       ? '<span class="badge ok">butce uygun</span>'
       : '<span class="badge warn">butce yetersiz</span>';
-    const sizeBadge = `<span class="badge plain">${it.ram_gb || "?"} GB</span>`;
+    const sizeBadge = it.cloud
+      ? '<span class="badge plain">boyut: bulut</span>'
+      : `<span class="badge plain">${it.ram_gb || "?"} GB</span>`;
     const paramBadge = it.parameters_b ? `<span class="badge plain">${it.parameters_b}B param</span>` : "";
     const tierBadge = it.tier ? `<span class="badge plain">${escapeHtml(it.tier)}</span>` : "";
     const hfBadge = it.src === "huggingface" ? '<span class="badge busy">HF</span>' : "";
@@ -251,7 +256,9 @@
       ? `<span class="badge plain">${typeof fmtNumber === "function" ? fmtNumber(it.popularity) : it.popularity} indirme</span>` : "";
 
     let actions = "";
-    if (!isAdmin) {
+    if (it.cloud) {
+      actions = `<span class="muted" style="font-size:0.78rem;">Yalnizca Ollama Cloud'da calisir — on-premise kurulamaz (veri disari cikar)</span>`;
+    } else if (!isAdmin) {
       actions = it.pulled
         ? `<span class="muted" style="font-size:0.78rem;">Sistemde kurulu — sohbette kullanilabilir</span>`
         : `<span class="muted" style="font-size:0.78rem;">Kurulum icin yoneticinize basvurun</span>`;

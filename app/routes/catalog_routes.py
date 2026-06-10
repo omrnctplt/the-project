@@ -252,13 +252,14 @@ async def discover_remote(
         if ql and ql not in m.get("tag", "").lower() and ql not in m.get("label", "").lower():
             continue
         size = float(m.get("approx_gb") or 0)
+        is_cloud = bool(m.get("cloud"))
         items.append({
             **m,
             "in_catalog": m.get("tag") in catalog_tags,
             "pulled": m.get("tag") in pulled_tags,
-            "fits": size <= budget_free + 0.01,
-            "fits_total": size <= budget_total + 0.01,
-            "recommended": (m.get("tier") == hw_tier) and (size <= budget_total + 0.01),
+            "fits": (not is_cloud) and size <= budget_free + 0.01,
+            "fits_total": (not is_cloud) and size <= budget_total + 0.01,
+            "recommended": (not is_cloud) and (m.get("tier") == hw_tier) and (size <= budget_total + 0.01),
         })
 
     items.sort(key=lambda it: (not it["recommended"], -int(it.get("popularity") or 0)))

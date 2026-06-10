@@ -109,6 +109,22 @@ def test_ollama_entries_to_models():
     assert r1["category"] == "reasoning"
     assert r1["tier"] == "laptop"
     assert r1["provider"] == "ollama"
+    assert r1["cloud"] is False
+
+
+def test_sizeless_entry_becomes_cloud_item():
+    # ollama.com'da boyut etiketi olmayanlar cloud modelleridir (deepseek-v4 vb.)
+    entries = [{
+        "name": "deepseek-v4-flash", "description": "Verimli MoE, 1M context.",
+        "pulls": 1000, "sizes": [], "capabilities": ["tools", "thinking"], "updated": "1 month ago",
+    }]
+    items = discovery.ollama_entries_to_models(entries)
+    assert len(items) == 1
+    it = items[0]
+    assert it["cloud"] is True
+    assert it["tag"] == "deepseek-v4-flash"
+    assert it["approx_gb"] is None and it["tier"] is None
+    assert it["category"] == "reasoning"
 
 
 def test_parse_hf_models():
