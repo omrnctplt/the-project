@@ -9,7 +9,7 @@
         b = document.createElement("div");
         b.id = "resOffline";
         b.className = "card";
-        b.style.cssText = "border-left:3px solid var(--error); margin-bottom:0.75rem;";
+        b.style.cssText = "border-left:3px solid var(--danger); margin-bottom:0.75rem;";
         const main = document.querySelector("main") || document.body;
         main.insertBefore(b, main.firstChild);
       }
@@ -47,6 +47,7 @@
     document.getElementById("vCpu").textContent = fmtNumber(h.cpu_percent, 1) + " %";
     document.getElementById("vCpuSub").textContent = (h.cpu_count || "?") + " cekirdek";
     barColor("statCpu", "vCpuBar", h.cpu_percent || 0);
+    setTemp("tempCpu", h.cpu_temp_c, "cpu");
 
     // Memory
     document.getElementById("vMem").textContent = `${fmtNumber(h.memory_used_gb, 1)} / ${fmtNumber(h.memory_total_gb, 1)} GB`;
@@ -57,6 +58,7 @@
     document.getElementById("vDisk").textContent = `${fmtNumber(h.disk_total_gb - h.disk_free_gb, 1)} / ${fmtNumber(h.disk_total_gb, 1)} GB`;
     document.getElementById("vDiskSub").textContent = fmtNumber(h.disk_percent, 1) + " % dolu · " + fmtNumber(h.disk_free_gb, 1) + " GB bos";
     barColor("statDisk", "vDiskBar", h.disk_percent || 0);
+    setTemp("tempDisk", h.disk_temp_c, "disk");
 
     // GPU'lar (varsa)
     renderGpus(d.gpus || []);
@@ -109,6 +111,12 @@
     }
   }
 
+  function setTemp(slotId, tempC, kind) {
+    const slot = document.getElementById(slotId);
+    if (!slot) return;
+    slot.innerHTML = (window.Charts && Charts.tempGauge) ? Charts.tempGauge(tempC, kind) : "";
+  }
+
   function renderGpus(gpus) {
     const sec = document.getElementById("gpuSection");
     if (!sec) return;
@@ -118,12 +126,13 @@
       const vramPct = g.vram_percent || 0;
       const utilPct = g.util_percent;
       const cls = vramPct > 90 ? "error" : vramPct > 75 ? "warn" : "ok";
+      const gauge = (window.Charts && Charts.tempGauge) ? Charts.tempGauge(g.temperature_c, "gpu") : "";
       const subBits = [];
       if (utilPct != null) subBits.push(`kullanim %${fmtNumber(utilPct, 0)}`);
-      if (g.temperature_c != null) subBits.push(`${g.temperature_c}°C`);
       if (g.power_w != null) subBits.push(`${fmtNumber(g.power_w, 0)} W`);
       return `
       <div class="stat ${cls}">
+        ${gauge ? `<div class="temp-slot">${gauge}</div>` : ""}
         <div class="stat-label">GPU ${g.index} · ${escapeHtml(g.name || "?")}</div>
         <div class="stat-value">${fmtNumber(g.vram_used_gb, 1)} / ${fmtNumber(g.vram_total_gb, 1)} GB</div>
         <div class="stat-sub">VRAM %${fmtNumber(vramPct, 1)}${subBits.length ? " · " + subBits.join(" · ") : ""}</div>

@@ -66,5 +66,26 @@
       `</svg>`;
   }
 
-  window.Charts = { donut, bars, sparkline, PALETTE };
+  /* Sicaklik gostergesi — yarim daire arc gauge. kind: cpu | gpu | disk.
+     null/saçma deger gelirse bos string doner (gosterge gizlenir). */
+  function tempGauge(tempC, kind = "cpu") {
+    const t = Number(tempC);
+    if (tempC == null || isNaN(t) || t <= 0 || t > 130) return "";
+    const limits = kind === "disk" ? [50, 65] : [60, 80];
+    const cls = t >= limits[1] ? "danger" : t >= limits[0] ? "warn" : "ok";
+    const arcLen = 75.4; // π × r(24)
+    const fill = (Math.min(1, t / 100) * arcLen).toFixed(1);
+    const label = Math.round(t);
+    return (
+      `<div class="temp-gauge ${cls}" role="img" aria-label="Sicaklik ${label} santigrat derece" title="Sicaklik: ${label}°C">` +
+      `<svg viewBox="0 0 64 44" aria-hidden="true">` +
+      `<path class="temp-track" d="M 8 36 A 24 24 0 0 1 56 36"></path>` +
+      `<path class="temp-val" d="M 8 36 A 24 24 0 0 1 56 36" stroke-dasharray="${fill} ${arcLen}"></path>` +
+      `<text class="temp-text" x="32" y="31">${label}°</text>` +
+      `<text class="temp-unit" x="32" y="41">SICAKLIK</text>` +
+      `</svg></div>`
+    );
+  }
+
+  window.Charts = { donut, bars, sparkline, tempGauge, PALETTE };
 })();

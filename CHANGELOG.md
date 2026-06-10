@@ -2,6 +2,16 @@
 
 Tum dikkat ceken degisiklikler bu dosyada listelenir. Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardina yakindir.
 
+## [0.7.2] - 2026-06-10
+
+### Added
+- **Her kaynaga sicaklik gostergesi** — CPU, disk ve GPU kartlarinin kosesinde renk kodlu yarim-daire SVG gauge (yesil < 60° / amber 60-79° / kirmizi >= 80°, disk icin 50/65; kritik seviyede nabiz animasyonu). Sensor yoksa gosterge gizlenir (donanim-farkindalik ilkesi)
+- **CPU + disk sicaklik toplama** — `psutil.sensors_temperatures` (coretemp/k10temp/nvme/drivetemp...) + `/sys/class/thermal` fallback'i; Windows gelistirme ortaminda zarifce None
+- **CPU asiri isinma onerisi** — >= 90°C'de otomatik aksiyon karti (thermal throttling uyarisi)
+
+### Fixed
+- Kaynaklar cevrimdisi banner'i tanimsiz `--error` yerine `--danger` rengini kullanir (gorunmeyen kenarlik)
+
 ## [0.7.1] - 2026-06-10
 
 ### Added

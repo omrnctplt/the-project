@@ -8,6 +8,7 @@ Uc kaynak:
 
 from __future__ import annotations
 
+import glob
 import logging
 import os
 import shutil
@@ -17,6 +18,72 @@ from typing import Any
 import psutil
 
 log = logging.getLogger(__name__)
+
+# CPU sicakligi icin bilinen sensor adlari, oncelik sirasiyla.
+# coretemp: Intel · k10temp/zenpower: AMD · cpu_thermal/soc_thermal: ARM SoC
+_CPU_SENSOR_KEYS = ("coretemp", "k10temp", "zenpower", "cpu_thermal", "soc_thermal", "acpitz")
+_DISK_SENSOR_KEYS = ("nvme", "drivetemp")
+
+
+def _max_reasonable(entries: Any) -> float | None:
+    vals = []
+    for e in entries or []:
+        cur = getattr(e, "current", None)
+        if cur and 1.0 <= cur <= 120.0:
+            vals.append(float(cur))
+    return round(max(vals), 1) if vals else None
+
+
+def _sensor_temps() -> dict[str, Any]:
+    fn = getattr(psutil, "sensors_temperatures", None)
+    if not fn:
+        return {}
+    try:
+        return fn() or {}
+    except Exception:
+        return {}
+
+
+def _read_thermal_zones() -> float | None:
+    """Linux /sys/class/thermal fallback'i — psutil sensor goremezse."""
+    best: float | None = None
+    for zf in glob.glob("/sys/class/thermal/thermal_zone*/temp"):
+        try:
+            with open(zf) as f:
+                v = int(f.read().strip()) / 1000.0
+        except (OSError, ValueError):
+            continue
+        if 1.0 <= v <= 120.0 and (best is None or v > best):
+            best = v
+    return round(best, 1) if best is not None else None
+
+
+def cpu_temperature() -> float | None:
+    """CPU paket sicakligi (°C). Linux'ta sensorlerden; yoksa None.
+
+    Windows'ta psutil sensor API'si bulunmadigindan None doner — UI bu
+    durumda gostergeyi gizler. Gercek on-prem Linux sunucuda calisir.
+    """
+    temps = _sensor_temps()
+    for key in _CPU_SENSOR_KEYS:
+        v = _max_reasonable(temps.get(key))
+        if v is not None:
+            return v
+    for entries in temps.values():
+        v = _max_reasonable(entries)
+        if v is not None:
+            return v
+    return _read_thermal_zones()
+
+
+def disk_temperature() -> float | None:
+    """NVMe/SATA disk sicakligi (°C) — sensor yoksa None."""
+    temps = _sensor_temps()
+    for key in _DISK_SENSOR_KEYS:
+        v = _max_reasonable(temps.get(key))
+        if v is not None:
+            return v
+    return None
 
 
 def host_summary() -> dict[str, Any]:
@@ -32,12 +99,14 @@ def host_summary() -> dict[str, Any]:
     return {
         "cpu_percent": cpu_percent,
         "cpu_count": psutil.cpu_count(logical=True) or 1,
+        "cpu_temp_c": cpu_temperature(),
         "memory_total_gb": round(mem.total / 1024**3, 2),
         "memory_used_gb": round(mem.used / 1024**3, 2),
         "memory_percent": mem.percent,
         "disk_total_gb": round(disk.total / 1024**3, 2),
         "disk_free_gb": round(disk.free / 1024**3, 2),
         "disk_percent": disk.percent,
+        "disk_temp_c": disk_temperature(),
     }
 
 
@@ -217,6 +286,14 @@ def actions_for_state(
             "severity": "warn",
             "title": "CPU %80'in uzerinde",
             "detail": "Aktif inference + arkaplan suregelen islemler. Idle unload suresini azaltabilirsiniz.",
+        })
+    cpu_temp = host.get("cpu_temp_c")
+    if cpu_temp is not None and cpu_temp >= 90:
+        actions.append({
+            "severity": "warn",
+            "title": f"CPU sicakligi {cpu_temp:.0f}°C",
+            "detail": "Islemci asiri isiniyor — sogutmayi kontrol edin; surekli yuksek sicaklikta "
+                      "thermal throttling yanit surelerini uzatir.",
         })
     if host["disk_percent"] > 90:
         actions.append({
