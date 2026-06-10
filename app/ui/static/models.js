@@ -2,16 +2,23 @@
   let catalog = {};        // model_id -> def
   let states = [];         // orchestrator states
   let discover = [];       // populer modeller
+  let remote = [];         // canli kesif (ollama.com + HF)
+  let remoteMeta = {};
   let capacity = {};
   let overridden = [];     // kullanici tarafindan eklenen (silinebilir) model id'leri
   let q = "";
   let cat = "";
   let st = "";
+  let remoteProv = "";
+  let remoteFit = "";
+  let pollTimer = null;
 
   const acc = document.getElementById("accordion");
   const searchInput = document.getElementById("searchInput");
   const catFilter = document.getElementById("catFilter");
   const statusFilter = document.getElementById("statusFilter");
+  const remoteGrid = document.getElementById("remoteGrid");
+  const remoteMetaEl = document.getElementById("remoteMeta");
 
   async function refresh() {
     try {
@@ -22,12 +29,86 @@
       overridden = catRes.overridden || [];
       const modelsRes = await api("/api/v1/models");
       states = modelsRes.states || [];
-      const dis = await api("/api/v1/system/discover");
-      discover = dis.models || [];
-      render();
     } catch (e) {
       toast("Yenileme hatasi: " + e.message, "error", 5000);
+      return;
     }
+    try {
+      const dis = await api("/api/v1/system/discover");
+      discover = dis.models || [];
+    } catch (e) {
+      discover = [];
+    }
+    render();
+    if (remote.length) renderRemote();
+    schedulePullPolling();
+  }
+
+  function schedulePullPolling() {
+    const pulling = states.some(s => s.status === "pulling");
+    if (pulling && !pollTimer) {
+      pollTimer = setTimeout(() => { pollTimer = null; refresh(); }, 4000);
+    }
+  }
+
+  async function refreshRemote(force) {
+    remoteGrid.innerHTML = `<div class="muted" style="padding:0.8rem;">Guncel model listesi yukleniyor...</div>`;
+    try {
+      const r = await api("/api/v1/system/discover/remote" + (force ? "?refresh=true" : ""));
+      remote = r.models || [];
+      remoteMeta = r;
+      renderRemote();
+    } catch (e) {
+      remote = [];
+      remoteGrid.innerHTML = `<div class="muted" style="padding:0.8rem;">Canli kesif su an kullanilamiyor (internet erisimi gerekli): ${escapeHtml(e.message)}</div>`;
+    }
+  }
+
+  function renderRemote() {
+    const pulledTags = new Set(states.filter(s => s.pulled).map(s => s.ollama_tag));
+    const catalogTags = new Set(Object.values(catalog).map(d => d.ollama_tag));
+    let items = remote.filter(it => {
+      if (remoteProv && it.provider !== remoteProv) return false;
+      if (remoteFit === "recommended" && !it.recommended) return false;
+      if (remoteFit === "fits" && !it.fits) return false;
+      const lq = q.toLowerCase().trim();
+      if (lq && !(`${it.label} ${it.tag}`.toLowerCase().includes(lq))) return false;
+      return true;
+    });
+    const shown = items.slice(0, 60);
+    if (remoteMetaEl && remoteMeta.fetched_at) {
+      const age = remoteMeta.age_minutes != null ? Math.round(remoteMeta.age_minutes) : "?";
+      const src = remoteMeta.sources || {};
+      remoteMetaEl.textContent =
+        `${remoteMeta.total} model bulundu (ollama.com: ${src.ollama || 0}, HuggingFace: ${src.huggingface || 0}) · ` +
+        `liste ${age} dk once guncellendi${remoteMeta.stale ? " · ESKI KOPYA (ag erisimi yok)" : ""}`;
+    }
+    if (!shown.length) {
+      remoteGrid.innerHTML = `<div class="muted" style="padding:0.8rem;">Filtreye uyan model yok.</div>`;
+      return;
+    }
+    remoteGrid.innerHTML = shown.map(it => renderCard({
+      source: "discover",
+      model_id: null,
+      label: it.label,
+      ollama_tag: it.tag,
+      category: it.category,
+      ram_gb: it.approx_gb,
+      parameters_b: it.parameters_b,
+      tier: it.tier,
+      src: it.provider === "huggingface" ? "huggingface" : null,
+      status: "discoverable",
+      pulled: pulledTags.has(it.tag),
+      in_catalog: catalogTags.has(it.tag),
+      recommended: it.recommended,
+      popularity: it.popularity,
+      inflight: 0, total_req: 0, avg_ms: null,
+      fits: it.fits,
+      blurb: it.blurb,
+    })).join("");
+    remoteGrid.querySelectorAll("button[data-action]").forEach(b => {
+      b.onclick = () => handleAction(b);
+    });
   }
 
   function render() {
@@ -53,6 +134,7 @@
         license: def.license,
         status: state?.status || "unknown",
         pulled: !!state?.pulled,
+        pull_progress: state?.pull_progress || 0,
         inflight: state?.inflight_requests || 0,
         total_req: state?.total_requests || 0,
         avg_ms: state?.avg_latency_ms,
@@ -140,11 +222,18 @@
   }
 
   function renderCard(it) {
-    const statusBadge = it.source === "discover" ? '<span class="badge">onerilen</span>'
-                     : it.pulled ? '<span class="badge ok">indirilmis</span>'
-                     : '<span class="badge warn">indirilmemis</span>';
+    const statusBadge = it.source === "discover"
+      ? (it.pulled ? '<span class="badge ok">indirilmis</span>'
+        : it.in_catalog ? '<span class="badge plain">katalogda</span>'
+        : it.recommended ? '<span class="badge ok">donanima onerilen</span>'
+        : '<span class="badge">kesfedildi</span>')
+      : it.pulled ? '<span class="badge ok">indirilmis</span>'
+      : '<span class="badge warn">indirilmemis</span>';
     const stateBadge = it.status && it.status !== "discoverable"
-      ? `<span class="badge ${stateClass(it.status)}">${it.status}</span>` : "";
+      ? (it.status === "pulling"
+        ? `<span class="badge busy">indiriliyor %${Math.round((it.pull_progress || 0) * 100)}</span>`
+        : `<span class="badge ${stateClass(it.status)}">${it.status}</span>`)
+      : "";
     const fitsBadge = it.fits
       ? '<span class="badge ok">butce uygun</span>'
       : '<span class="badge warn">butce yetersiz</span>';
@@ -152,11 +241,15 @@
     const paramBadge = it.parameters_b ? `<span class="badge plain">${it.parameters_b}B param</span>` : "";
     const tierBadge = it.tier ? `<span class="badge plain">${escapeHtml(it.tier)}</span>` : "";
     const hfBadge = it.src === "huggingface" ? '<span class="badge busy">HF</span>' : "";
+    const popBadge = it.popularity
+      ? `<span class="badge plain">${typeof fmtNumber === "function" ? fmtNumber(it.popularity) : it.popularity} indirme</span>` : "";
 
     let actions = "";
     if (it.source === "discover") {
-      actions = `
-        <button class="primary" data-action="add-pull" data-tag="${escapeHtml(it.ollama_tag)}" data-cat="${it.category}" data-gb="${it.ram_gb}" data-label="${escapeHtml(it.label)}" ${it.fits ? "" : "disabled title='Butceye sigmiyor'"}>+ Ekle & pull</button>
+      actions = it.pulled
+        ? `<span class="muted" style="font-size:0.78rem;">Sistemde kurulu</span>`
+        : `
+        <button class="primary" data-action="add-pull" data-tag="${escapeHtml(it.ollama_tag)}" data-cat="${it.category}" data-gb="${it.ram_gb}" data-label="${escapeHtml(it.label)}" ${it.fits ? "" : "disabled title='Butceye sigmiyor'"}>+ Kur (ekle & pull)</button>
       `;
     } else if (!it.pulled) {
       actions = `<button class="primary" data-action="pull" data-mid="${escapeHtml(it.model_id)}" ${it.fits ? "" : "title='Butceye sigmiyor'"}>Pull et</button>`;
@@ -173,6 +266,7 @@
       ? `<div class="muted" style="font-size:0.72rem;">${it.total_req} istek · ort ${it.avg_ms ? Math.round(it.avg_ms) : "—"} ms</div>`
       : "";
     const cls = `model-card ${it.pulled ? "in-catalog" : ""} ${it.fits ? "fits-current" : ""}`;
+    const metaBadges = `${sizeBadge}${paramBadge}${tierBadge}${statusBadge}${stateBadge}${fitsBadge}${hfBadge}${popBadge}`;
     const budgetTotal = parseFloat(capacity.budget_total_gb || 0);
     const pct = budgetTotal ? Math.min(100, (parseFloat(it.ram_gb || 0) / budgetTotal) * 100) : 0;
     const usageBar = budgetTotal ? `
@@ -189,7 +283,7 @@
           </div>
         </div>
         ${it.blurb ? `<div class="blurb">${escapeHtml(it.blurb)}</div>` : ""}
-        <div class="meta">${sizeBadge}${paramBadge}${tierBadge}${statusBadge}${stateBadge}${fitsBadge}${hfBadge}</div>
+        <div class="meta">${metaBadges}</div>
         ${usageBar}
         ${stats}
         <div class="actions">${actions}</div>
@@ -228,7 +322,7 @@
         toast("Pull baslatildi", "ok");
       } else if (act === "add-pull") {
         const tag = btn.dataset.tag;
-        const mid = tag.replace(/[:.]/g, "-").replace(/[^a-zA-Z0-9._\-]/g, "");
+        const mid = tagToModelId(tag);
         try {
           await api("/api/v1/system/catalog/models", {
             method: "POST",
@@ -238,9 +332,11 @@
               profile: btn.dataset.label,
             }),
           });
-        } catch {}
+        } catch (e) {
+          if (!/zaten|already|exist/i.test(e.message || "")) throw e;
+        }
         await api(`/api/v1/system/pull/${encodeURIComponent(mid)}`, { method: "POST" });
-        toast("Ekleme + pull baslatildi", "ok");
+        toast("Kurulum baslatildi: katalog + indirme", "ok");
       } else if (act === "remove") {
         if (!confirm(`'${btn.dataset.mid}' override silinsin mi?`)) {
           btn.disabled = false; btn.textContent = orig; return;
@@ -260,15 +356,24 @@
         await api(`/api/v1/system/models/${encodeURIComponent(btn.dataset.mid)}/pulled`, { method: "DELETE" });
         toast("Model Ollama'dan silindi", "ok");
       }
-      setTimeout(refresh, 500);
+      setTimeout(async () => { await refresh(); renderRemote(); }, 500);
     } catch (err) {
       toast("Hata: " + err.message, "error", 5000);
       btn.disabled = false; btn.textContent = orig;
     }
   }
 
+  function tagToModelId(tag) {
+    return tag.replace(/[:.\/]/g, "-").replace(/[^a-zA-Z0-9._\-]/g, "").slice(0, 64);
+  }
+
   // Search / filter
-  searchInput.addEventListener("input", (e) => { q = e.target.value; render(); });
+  let searchDebounce = null;
+  searchInput.addEventListener("input", (e) => {
+    q = e.target.value;
+    clearTimeout(searchDebounce);
+    searchDebounce = setTimeout(() => { render(); renderRemote(); }, 180);
+  });
   catFilter.addEventListener("click", (e) => {
     if (!e.target.matches("button")) return;
     catFilter.querySelectorAll("button").forEach(b => b.classList.remove("active"));
@@ -284,6 +389,28 @@
     render();
   });
 
+  const remoteProviderFilter = document.getElementById("remoteProviderFilter");
+  const remoteFitFilter = document.getElementById("remoteFitFilter");
+  remoteProviderFilter.addEventListener("click", (e) => {
+    if (!e.target.matches("button")) return;
+    remoteProviderFilter.querySelectorAll("button").forEach(b => b.classList.remove("active"));
+    e.target.classList.add("active");
+    remoteProv = e.target.dataset.prov || "";
+    renderRemote();
+  });
+  remoteFitFilter.addEventListener("click", (e) => {
+    if (!e.target.matches("button")) return;
+    remoteFitFilter.querySelectorAll("button").forEach(b => b.classList.remove("active"));
+    e.target.classList.add("active");
+    remoteFit = e.target.dataset.fit || "";
+    renderRemote();
+  });
+  document.getElementById("remoteRefreshBtn").onclick = async (e) => {
+    e.target.disabled = true;
+    await refreshRemote(true);
+    e.target.disabled = false;
+  };
+
   document.getElementById("refreshBtn").onclick = refresh;
   document.getElementById("addCustomBtn").onclick = openCustomModal;
 
@@ -297,6 +424,7 @@
           <option value="text">Metin</option>
           <option value="code">Kod</option>
           <option value="reasoning">Reasoning</option>
+          <option value="persona">Persona</option>
           <option value="fallback">Fallback</option>
         </select></label>
         <label>RAM/VRAM (GB) <input id="cm_ram" type="number" step="0.1" min="0.1" placeholder="3.0" /></label>
@@ -311,7 +439,7 @@
         const cat = document.getElementById("cm_cat").value;
         const ram = parseFloat(document.getElementById("cm_ram").value);
         if (!tag || isNaN(ram)) { toast("Tag ve RAM zorunlu", "warn"); return; }
-        const mid = tag.replace(/[:.]/g, "-").replace(/[^a-zA-Z0-9._\-]/g, "");
+        const mid = tagToModelId(tag);
         try {
           await api("/api/v1/system/catalog/models", {
             method: "POST",
@@ -338,7 +466,7 @@
         const cat = document.getElementById("cm_cat").value;
         const ram = parseFloat(document.getElementById("cm_ram").value);
         if (!tag || isNaN(ram)) { toast("Tag ve RAM zorunlu", "warn"); return; }
-        const mid = tag.replace(/[:.]/g, "-").replace(/[^a-zA-Z0-9._\-]/g, "");
+        const mid = tagToModelId(tag);
         try {
           const r = await api("/api/v1/system/catalog/dry-run", {
             method: "POST",
@@ -353,5 +481,6 @@
     }, 50);
   }
 
-  refresh();
+  await refresh();
+  refreshRemote(false);
 })();

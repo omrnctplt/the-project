@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+import secrets
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -20,12 +21,41 @@ from .config import DATA_DIR, load_default_users
 log = logging.getLogger(__name__)
 
 DB_PATH = DATA_DIR / "users.db"
-JWT_SECRET = os.getenv("JWT_SECRET", "")
+JWT_SECRET_PATH = DATA_DIR / "jwt_secret"
+JWT_PLACEHOLDER = "lutfen-bu-degeri-uzun-rastgele-bir-stringle-degistirin"
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRES_HOURS = int(os.getenv("JWT_EXPIRES_HOURS", "8"))
 
-if not JWT_SECRET or JWT_SECRET == "lutfen-bu-degeri-uzun-rastgele-bir-stringle-degistirin":
-    log.warning("JWT_SECRET zayif veya eksik. .env dosyasinda guclu bir degerle degistirin.")
+
+def _resolve_jwt_secret() -> str:
+    env_secret = os.getenv("JWT_SECRET", "").strip()
+    if env_secret and env_secret != JWT_PLACEHOLDER:
+        return env_secret
+    try:
+        existing = JWT_SECRET_PATH.read_text(encoding="utf-8").strip()
+        if existing:
+            return existing
+    except OSError:
+        pass
+    secret = secrets.token_urlsafe(48)
+    try:
+        JWT_SECRET_PATH.parent.mkdir(parents=True, exist_ok=True)
+        JWT_SECRET_PATH.write_text(secret, encoding="utf-8")
+        try:
+            os.chmod(JWT_SECRET_PATH, 0o600)
+        except OSError:
+            pass
+        log.info("JWT_SECRET verilmedi; guvenli secret otomatik uretildi: %s", JWT_SECRET_PATH)
+    except OSError:
+        log.warning(
+            "JWT secret %s dosyasina yazilamadi; gecici bellek-ici secret kullaniliyor "
+            "(yeniden baslatmada oturumlar dusebilir).",
+            JWT_SECRET_PATH,
+        )
+    return secret
+
+
+JWT_SECRET = _resolve_jwt_secret()
 
 _lock = RLock()
 security = HTTPBearer()

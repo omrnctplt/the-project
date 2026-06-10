@@ -57,7 +57,7 @@ class ChatStreamRequest(_Base):
 class CatalogModelRequest(_Base):
     model_id: str = Field(..., min_length=1, max_length=64, pattern=r"^[a-zA-Z0-9._\-]+$")
     ollama_tag: str = Field(..., min_length=1, max_length=128)
-    category: str = Field(..., pattern="^(text|code|reasoning|fallback)$")
+    category: str = Field(..., pattern="^(text|code|reasoning|persona|fallback)$")
     parameters_b: float | None = Field(default=None, ge=0.0, le=1000.0)
     ram_gb: float = Field(..., gt=0.0, le=512.0)
     vram_gb: float | None = Field(default=None, gt=0.0, le=512.0)

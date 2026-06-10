@@ -6,17 +6,17 @@
 [![docker](https://img.shields.io/badge/docker-compose-2496ED.svg)](https://docs.docker.com/compose/)
 [![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-> **Departman bazli, donanima gore kendini ayarlayan, tek `docker compose up` ile ayaga kalkan, on-premise LLM gateway.**
+> **Departman bazli, donanima gore kendini ayarlayan, sifir konfigurasyonla tek `docker compose up -d --build` ile ayaga kalkan, on-premise LLM gateway.**
 
-Kucuk ekipler icin Ollama'nin onunde duran bir yonlendirme katmani. Sistem ilk acilista donanimi olcer, uygun **kapasite profilini** secer, **departman + prompt** tabanli akilli yonlendirme yapar, butun istekleri **denetler**. UI, REST API, Prometheus metrikleri ve Grafana paneli kutudan cikar cikmaz hazirdir.
+Kucuk ekipler icin Ollama'nin onunde duran bir yonlendirme katmani. Sistem ilk acilista donanimi olcer, uygun **kapasite profilini** secer, **departman + prompt** tabanli akilli yonlendirme yapar, butun istekleri **denetler**. **Canli model kesfi** ollama.com + HuggingFace'ten guncel model listesini otomatik ceker — yeni bir model ciktiginda arayuzu veya katalogu elle guncellemek gerekmez. UI, REST API, Prometheus metrikleri ve Grafana paneli kutudan cikar cikmaz hazirdir.
 
 ---
 
 ## Yetenekler
 
 ### Calistirma
-- **Tek komut:** `make up` (Linux/Mac/WSL) veya `docker compose up -d --build`
-- **Port preflight:** Cakisan portlari otomatik tespit, oneri ile uyari
+- **Tek komut, sifir konfigurasyon:** `docker compose up -d --build` — `.env` dosyasi bile gerekmez; `JWT_SECRET` verilmezse sistem guvenli bir secret uretip `data/jwt_secret` dosyasinda kalici saklar
+- **Port preflight:** `make up` ile cakisan portlari otomatik tespit, oneri ile uyari
 - **Resource limit'leri:** gateway ve ollama icin compose `mem_limit` + `cpus`
 - **Lazy pull:** Kullanici secinceye kadar disk veya ag yuku yok — model otomatik inmez
 - **Bootstrap stage stream:** Donanim tarama, plan, orchestrator baslama her adim canli UI'da
@@ -38,11 +38,14 @@ Kucuk ekipler icin Ollama'nin onunde duran bir yonlendirme katmani. Sistem ilk a
 - **Keyword + always rule:** Kod blogu icin `code`, matematik icin `reasoning`, aksi halde departman primary
 - **Fallback chain:** Hedef kategoride hazir model yoksa fallback'a duser
 
-### Model katalogu
-- **41 model havuzu** — donanim tier'li (edge/laptop/workstation/datacenter): Qwen3, Llama 4 (Scout/Maverick), DeepSeek-V3/R1, Gemma 3, Phi-4, Mistral, Mixtral, Kimi, SmolLM3, gpt-oss, Granite...
-- **Donanima gore dinamik oneri** — discover, donanim tier'ina gore uygun modelleri one cikarir (laptop'ta kucuk, H100/H200'de dev modeller)
+### Model katalogu & canli kesif
+- **Canli kesif (yeni):** ollama.com kutuphanesi (~230 model, tum boyut varyantlari) + HuggingFace GGUF API'sinden guncel model listesi otomatik cekilir, 24 saat TTL ile cache'lenir — **yeni model ciktiginda UI/katalog guncellemesi gerekmez**, "Listeyi guncelle" yeterli
+- **Offline dostu:** Ag yoksa eski kopyaya, o da yoksa statik kataloga duser; on-premise ortam hic bozulmaz
+- **41 modellik statik havuz** — donanim tier'li (edge/laptop/workstation/datacenter): Qwen3, Llama 4 (Scout/Maverick), DeepSeek-V3/R1, Gemma 3, Phi-4, Mistral, Mixtral, SmolLM3, gpt-oss, Granite...
+- **Donanima gore dinamik oneri** — hem statik hem canli kesif, donanim tier'ina gore uygun modelleri one cikarir (laptop'ta kucuk, H100/H200'de dev modeller); RAM ihtiyaci parametre sayisindan otomatik tahmin edilir
+- **Tek tikla kur/kaldir:** kesif kartindan "+ Kur" katalog kaydi + indirmeyi tek adimda baslatir; "Ollama'dan sil" diski tek tikla bosaltir
 - **Persona / rol yapma** kategorisi + admin **kategori → model atamasi** (Ayarlar sayfasi)
-- **HuggingFace destegi** — `hf.co/...` GGUF tag'leri ile tek-tik ekleme + pull; **Ollama'dan gercek silme** (disk bosaltir)
+- **HuggingFace destegi** — `hf.co/...` GGUF tag'leri ile ekleme + pull; sharded (Ollama'nin desteklemedigi) repolar otomatik elenir
 - **Inspect:** Ollama `/api/show` ile gercek boyut tahmini
 - **Dry-run:** Modeli eklemeden once "tum profillerde butceye sigar mi?" raporu
 - **Override katmani:** `data/catalog_overrides.yaml` ile kullanici eklemeleri YAML'a dokunmadan saklanir
@@ -55,8 +58,9 @@ Kucuk ekipler icin Ollama'nin onunde duran bir yonlendirme katmani. Sistem ilk a
 - **Usage tracking:** Kullanici × gun × model bazli token/istek/latency
 
 ### Guvenlik
-- **JWT auth** (`HS256`, 8 saatlik TTL)
+- **JWT auth** (`HS256`, 8 saatlik TTL) — secret verilmezse otomatik uretilir ve kalici saklanir
 - **bcrypt** ile sifre hashleme
+- **Login brute-force korumasi** — kullanici basina dakikada 10 deneme
 - **Rate limit** departman bazli (in-memory sliding window)
 - **Rol bazli erisim:** `admin` / `user`
 - **Sifre degistirme** endpoint'i + UI modal
@@ -75,6 +79,21 @@ Kucuk ekipler icin Ollama'nin onunde duran bir yonlendirme katmani. Sistem ilk a
 ### 1. Tek komut
 
 ```bash
+docker compose up -d --build
+```
+
+Hepsi bu. `.env` dosyasi gerekmez: `JWT_SECRET` otomatik uretilir, portlar ve
+limitler mantikli varsayilanlarla gelir, sistem ilk acilista donanimi olcup
+kendine uygun kapasite profilini secer.
+
+GPU overlay ile (NVIDIA Container Toolkit gerekir):
+```bash
+docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
+```
+
+### 2. Alternatif: `make up` (preflight'li)
+
+```bash
 make up
 ```
 
@@ -83,17 +102,6 @@ make up
 2. `.env` yoksa otomatik olusturur (`.env.example`'dan)
 3. Compose build + up (gateway, ollama, prometheus, grafana)
 4. Servis URL'lerini yazdirir
-
-### 2. Alternatif (compose dogrudan)
-
-```bash
-docker compose up -d --build
-```
-
-GPU overlay ile:
-```bash
-docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
-```
 
 ### 3. UI'yi ac
 
@@ -268,7 +276,8 @@ OpenAPI / Swagger: **http://localhost:8080/docs**
 | `POST /api/v1/system/pull/{model_id}` | Manuel pull tetikle (admin) |
 | `POST /api/v1/system/ollama/inspect` | Ollama'dan boyut tahmin et |
 | `GET  /api/v1/system/ollama/local` | Yerel Ollama modelleri (admin) |
-| `GET  /api/v1/system/discover` | Onerilen + filtreli modeller |
+| `GET  /api/v1/system/discover` | Statik katalogdan onerilen + filtreli modeller |
+| `GET  /api/v1/system/discover/remote` | **Canli kesif**: ollama.com + HuggingFace guncel listesi (`?refresh=true` admin ile interneti zorlar) |
 
 ### Sistem & profil
 | | |
@@ -347,7 +356,7 @@ Tum onemli alanlar:
 
 ```bash
 # Guvenlik
-JWT_SECRET=...                          # MUTLAKA degistirin
+JWT_SECRET=                             # bos birakilabilir: otomatik uretilir (data/jwt_secret)
 ADMIN_PASSWORD=admin
 
 # Portlar (cakisma varsa degistir)
@@ -370,11 +379,15 @@ OLLAMA_CPU_LIMIT=4.0
 OLLAMA_KEEP_ALIVE=3m
 OLLAMA_NUM_PARALLEL=
 OLLAMA_MAX_LOADED_MODELS=
-OLLAMA_KV_CACHE_TYPE=q8_0
+OLLAMA_KV_CACHE_TYPE=f16                # q8_0 icin OLLAMA_FLASH_ATTENTION=true gerekir
 
 # Gateway davranisi
 AUTO_PULL_MODELS=false                  # ONERILEN: false
 IDLE_UNLOAD_MINUTES=3
+
+# Canli kesif
+DISCOVERY_TTL_HOURS=24                  # uzak katalog cache suresi
+DISCOVERY_HF_LIMIT=40                   # HuggingFace'ten cekilecek repo sayisi
 ```
 
 ---
@@ -384,11 +397,12 @@ IDLE_UNLOAD_MINUTES=3
 ```
 .
 ├── app/                      # Python paketi
-│   ├── main.py               # FastAPI uygulamasi, 41 endpoint
-│   ├── auth.py               # JWT + bcrypt + SQLite
+│   ├── main.py               # FastAPI uygulamasi, 42 endpoint
+│   ├── auth.py               # JWT + bcrypt + SQLite (secret otomatik uretimi)
 │   ├── capacity.py           # Profil bazli kapasite planlayicisi
 │   ├── orchestrator.py       # Model lifecycle (lazy pull, idle unload)
 │   ├── ollama_client.py      # HTTP istemci (sync + stream)
+│   ├── discovery.py          # Canli kesif: ollama.com + HuggingFace (TTL cache)
 │   ├── router.py             # Routing + prompt-aware size
 │   ├── hwprobe.py            # Donanim tespiti (CPU/RAM/GPU/disk)
 │   ├── sysmonitor.py         # psutil + docker stats
@@ -412,7 +426,7 @@ IDLE_UNLOAD_MINUTES=3
 │   ├── preflight.sh          # Linux/Mac
 │   └── preflight.ps1         # Windows PowerShell
 ├── simulator/                # Yuk uretici container
-├── tests/                    # pytest (capacity, router, auth, usage, config, audit, orchestrator, ollama_client, integration — 74 test)
+├── tests/                    # pytest (capacity, router, auth, usage, config, audit, orchestrator, ollama_client, discovery, integration — 87 test)
 ├── data/                     # Runtime: users.db + audit.db + usage.db
 │                             # + runtime_config.yaml + catalog_overrides.yaml
 ├── docker-compose.yml
@@ -432,7 +446,8 @@ IDLE_UNLOAD_MINUTES=3
 | `8080 portu kullanimda` | `.env`'de `GATEWAY_PORT=9080` gibi degisik bir port verin, `make up` tekrar |
 | Gateway 502 donuyor | `/readyz` 503 mu? Model henuz pull edilmemis olabilir, Modeller sayfasindan pull edin |
 | GPU goremiyor | `docker compose -f docker-compose.yml -f docker-compose.gpu.yml up` + NVIDIA Container Toolkit |
-| `JWT_SECRET zorunlu` | `.env` dosyasini olusturup `JWT_SECRET` doldurun (rastgele 32+ karakter) |
+| Oturumlar restart sonrasi dusuyor | `data/` volume'unu silmeyin (otomatik uretilen `jwt_secret` orada) ya da `.env`'de sabit `JWT_SECRET` verin |
+| Canli kesif bos geliyor | Internet erisimi gerekir; offline ortamda statik katalog calismaya devam eder |
 | Bootstrap overlay'i her sayfada cikiyor | Tarayici cache temizleyin (Ctrl+Shift+R) |
 | RAM yanlis algilaniyor (Docker Desktop) | `.env`'de `HOST_RAM_GB=16` gibi acikca yazin |
 
@@ -452,7 +467,7 @@ pytest -q tests/
 docker compose up -d --build gateway
 ```
 
-Tum testler gecmeli — **74 test** (`pytest -q tests/`).
+Tum testler gecmeli — **87 test** (`pytest -q tests/`).
 
 ---
 

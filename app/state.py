@@ -102,4 +102,5 @@ class AppState:
     router: Router | None = None
     ready: bool = False
     tasks: list[asyncio.Task] = field(default_factory=list)
+    sweep_task: asyncio.Task | None = None
     bootstrap: BootstrapTracker = field(default_factory=BootstrapTracker)

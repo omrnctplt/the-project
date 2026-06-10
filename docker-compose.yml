@@ -14,7 +14,7 @@ services:
     environment:
       <<: *common-env
       OLLAMA_HOST: http://ollama:11434
-      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET zorunlu, .env dosyasini doldurun}
+      JWT_SECRET: ${JWT_SECRET:-}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}
       DATA_DIR: /data
       CONFIG_DIR: /etc/onprem-ai
@@ -59,7 +59,7 @@ services:
       OLLAMA_MAX_LOADED_MODELS: ${OLLAMA_MAX_LOADED_MODELS:-1}
       OLLAMA_HOST: 0.0.0.0:11434
       OLLAMA_FLASH_ATTENTION: ${OLLAMA_FLASH_ATTENTION:-false}
-      OLLAMA_KV_CACHE_TYPE: ${OLLAMA_KV_CACHE_TYPE:-q8_0}
+      OLLAMA_KV_CACHE_TYPE: ${OLLAMA_KV_CACHE_TYPE:-f16}
     volumes:
       - ollama_models:/root/.ollama
     ports:

@@ -19,7 +19,7 @@ from fastapi.templating import Jinja2Templates
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from . import __version__
-from . import audit, auth, capacity as capacity_mod, config as cfg, hwprobe, metrics, sysmonitor, usage
+from . import audit, auth, capacity as capacity_mod, config as cfg, discovery, hwprobe, metrics, sysmonitor, usage
 from .models import (
     CatalogModelRequest,
     ChatRequest,
@@ -200,7 +200,8 @@ async def _bootstrap(state: AppState) -> None:
     state.bootstrap.finished_at = time.time()
     log.info("Gateway hazir. ONBOARDING bekleniyor — kullanici model secinceye kadar pull yapilmaz.")
 
-    state.tasks.append(asyncio.create_task(orch.idle_sweep_loop()))
+    state.sweep_task = asyncio.create_task(orch.idle_sweep_loop())
+    state.tasks.append(state.sweep_task)
 
 
 @asynccontextmanager
@@ -333,6 +334,15 @@ async def metrics_endpoint(request: Request) -> Any:
 
 @app.post("/login", response_model=TokenResponse)
 async def login(body: LoginRequest) -> TokenResponse:
+    allowed, _ = usage.check_and_record_rate(
+        key=f"login:{body.username}", limit_per_min=10
+    )
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail="Cok fazla giris denemesi, biraz bekleyin",
+            headers={"Retry-After": "60"},
+        )
     user = auth.authenticate(body.username, body.password)
     if not user:
         raise HTTPException(status_code=401, detail="Kullanici adi veya sifre hatali")
@@ -752,7 +762,8 @@ async def discover_models(
     hw_tier = cap.get("hardware_tier", "laptop")
     accelerator = cap.get("accelerator", "cpu")
     budget_total = float(cap.get("budget_total_gb", 0) or 0)
-    budget_free = float(cap.get("budget_free_gb", budget_total) or 0)
+    raw_free = cap.get("budget_free_gb")
+    budget_free = budget_total if raw_free is None else float(raw_free)
 
     pulled_ids: set[str] = set()
     if state.orchestrator:
@@ -793,7 +804,7 @@ async def discover_models(
             "parameters_b": m.get("parameters_b"),
             "in_catalog": True,
             "pulled": mid in pulled_ids,
-            "fits": size <= (budget_free + 0.01) if budget_free else size <= (budget_total + 0.01),
+            "fits": size <= budget_free + 0.01,
             "fits_total": size <= (budget_total + 0.01),
             "recommended": (mtier == hw_tier) and (size <= budget_total + 0.01),
         })
@@ -805,6 +816,75 @@ async def discover_models(
         "accelerator": accelerator,
         "categories": ["text", "code", "reasoning", "persona", "fallback"],
         "tiers": list(capacity_mod.TIER_ORDER),
+    }
+
+
+@app.get("/api/v1/system/discover/remote")
+async def discover_remote(
+    q: str | None = None,
+    category: str | None = None,
+    provider: str | None = None,
+    tier: str | None = None,
+    refresh: bool = False,
+    limit: int = 200,
+    request: Request = None,  # type: ignore
+    principal: dict[str, Any] = Depends(auth.current_principal),
+) -> dict[str, Any]:
+    """Canli uzak katalog — ollama.com + HuggingFace'ten guncel modeller.
+
+    Sonuc TTL'li cache'ten gelir; `refresh=true` (admin) interneti zorlar.
+    Yeni cikan modeller icin UI/katalog guncellemesi gerekmez.
+    """
+    force = bool(refresh) and principal.get("role") == "admin"
+    remote = await discovery.get_remote_catalog(force=force)
+
+    state = _state(request)
+    catalog_models = (state.catalog or {}).get("models", {}) or {}
+    catalog_tags = {str(m.get("ollama_tag", "")) for m in catalog_models.values()}
+    cap = state.capacity or {}
+    hw_tier = cap.get("hardware_tier", "laptop")
+    budget_total = float(cap.get("budget_total_gb", 0) or 0)
+    raw_free = cap.get("budget_free_gb")
+    budget_free = budget_total if raw_free is None else float(raw_free)
+
+    pulled_tags: set[str] = set()
+    if state.orchestrator:
+        for s in state.orchestrator.states():
+            if s.get("pulled"):
+                pulled_tags.add(str(s.get("ollama_tag", "")))
+
+    ql = (q or "").lower().strip()
+    items = []
+    for m in remote.get("models", []):
+        if category and m.get("category") != category:
+            continue
+        if provider and m.get("provider") != provider:
+            continue
+        if tier and m.get("tier") != tier:
+            continue
+        if ql and ql not in m.get("tag", "").lower() and ql not in m.get("label", "").lower():
+            continue
+        size = float(m.get("approx_gb") or 0)
+        items.append({
+            **m,
+            "in_catalog": m.get("tag") in catalog_tags,
+            "pulled": m.get("tag") in pulled_tags,
+            "fits": size <= budget_free + 0.01,
+            "fits_total": size <= budget_total + 0.01,
+            "recommended": (m.get("tier") == hw_tier) and (size <= budget_total + 0.01),
+        })
+
+    items.sort(key=lambda it: (not it["recommended"], -int(it.get("popularity") or 0)))
+    fetched_at = float(remote.get("fetched_at") or 0)
+    return {
+        "models": items[: max(1, min(limit, 1000))],
+        "total": len(items),
+        "hardware_tier": hw_tier,
+        "fetched_at": fetched_at,
+        "age_minutes": round((time.time() - fetched_at) / 60, 1) if fetched_at else None,
+        "stale": bool(remote.get("stale")),
+        "errors": remote.get("errors") or [],
+        "sources": remote.get("sources") or {},
     }
 
 
@@ -942,16 +1022,20 @@ async def _replan(request: Request) -> dict[str, Any]:
     state = _state(request)
     state.runtime_config = cfg.load_runtime_config()
     _make_plan(state)
+    if state.sweep_task and not state.sweep_task.done():
+        state.sweep_task.cancel()
     if state.orchestrator:
         try:
             await state.orchestrator.client.aclose()
         except Exception:
             pass
+    state.tasks = [t for t in state.tasks if not t.done()]
     state.orchestrator = _build_orchestrator(state)
     state.router = Router(state.catalog, state.orchestrator, state.runtime_config.get("category_assignments"))
     _refresh_capacity_metrics(state)
     state.tasks.append(asyncio.create_task(state.orchestrator.pull_initial()))
-    state.tasks.append(asyncio.create_task(state.orchestrator.idle_sweep_loop()))
+    state.sweep_task = asyncio.create_task(state.orchestrator.idle_sweep_loop())
+    state.tasks.append(state.sweep_task)
     return state.capacity
 
 

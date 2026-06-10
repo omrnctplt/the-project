@@ -1,10 +1,13 @@
 """Donanim kesfi — CPU, RAM, GPU/VRAM, disk.
 
-Container icinden cagrilir. Oncelik sirasi:
+Container icinden cagrilir. RAM icin oncelik sirasi:
   1. HOST_RAM_GB env var (kullanici manuel belirtti)
-  2. cgroup v2/v1 memory limit (Docker resource limit)
-  3. /proc/meminfo MemTotal (WSL2 / Linux host)
-  4. psutil.virtual_memory().total
+  2. /proc/meminfo MemTotal (WSL2 / Linux host)
+  3. psutil.virtual_memory().total
+
+Gateway'in kendi cgroup limiti (GATEWAY_MEM_LIMIT) bilgi amacli raporlanir
+ama efektif RAM hesabina KATILMAZ: modeller ayri bir container'da (ollama)
+calisir, gateway'in 512 MB limiti model butcesini temsil etmez.
 Sonuc /data/hw_profile.json'a yazilir.
 """
 
@@ -196,17 +199,12 @@ def detect_memory() -> dict[str, Any]:
     meminfo = _read_proc_meminfo() or {}
     override = _read_host_ram_override_gb()
 
-    candidates: list[tuple[str, float]] = []
     if override:
-        candidates.append(("HOST_RAM_GB override", override))
-    if cgroup_limit:
-        candidates.append(("cgroup limit", cgroup_limit))
-    if meminfo.get("MemTotal"):
-        candidates.append(("/proc/meminfo MemTotal", round(meminfo["MemTotal"], 2)))
-    candidates.append(("psutil", psutil_total))
-
-    effective = min(v for _, v in candidates)
-    source = next(name for name, v in candidates if v == effective)
+        effective, source = override, "HOST_RAM_GB override"
+    elif meminfo.get("MemTotal"):
+        effective, source = round(meminfo["MemTotal"], 2), "/proc/meminfo MemTotal"
+    else:
+        effective, source = psutil_total, "psutil"
 
     available = psutil_avail
     if "MemAvailable" in meminfo:

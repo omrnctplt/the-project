@@ -2,6 +2,31 @@
 
 Tum dikkat ceken degisiklikler bu dosyada listelenir. Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardina yakindir.
 
+## [0.6.0] - 2026-06-10
+
+Sifir konfigurasyonla tek komut + canli model kesfi.
+
+### Added
+- **Canli model kesfi** (`app/discovery.py`) — ollama.com kutuphanesi (~230 model, tum boyut varyantlari) + HuggingFace GGUF API'sinden guncel model listesi; 24 saat TTL'li disk cache (`data/remote_catalog.json`), ag yoksa stale cache'e dusen offline-dostu tasarim. Yeni model ciktiginda UI/katalog guncellemesi gerekmez.
+- **`GET /api/v1/system/discover/remote`** — canli katalog endpoint'i: arama, kategori/kaynak/tier filtresi, donanima uygunluk (`fits`, `recommended`) isaretleri, `?refresh=true` (admin) ile aninda guncelleme
+- **Modeller sayfasinda "Canli kesif" bolumu** — kaynak (Ollama/HF) ve uygunluk filtreleri, "Listeyi guncelle" butonu, tek tikla **Kur** (katalog + indirme tek adim)
+- **JWT_SECRET otomatik uretimi** — env verilmezse guvenli secret uretilir ve `data/jwt_secret` dosyasinda kalici saklanir; `.env` dosyasi olmadan `docker compose up -d --build` tek basina calisir
+- **Login brute-force korumasi** — kullanici basina dakikada 10 deneme (429 + `Retry-After`)
+- **Pull ilerleme gostergesi** — indirme surerken kartta yuzde rozeti + 4 sn'de bir otomatik yenileme
+- **RAM tahmin motoru** — parametre sayisindan Q4_K_M kalibrasyonlu bellek tahmini; HF sharded GGUF repolari (Ollama desteklemiyor) otomatik elenir
+- 13 yeni test (`tests/test_discovery.py`): parse, RAM tahmini, cache TTL, offline fallback, endpoint entegrasyonu (68 -> 87)
+
+### Fixed
+- **Donanim RAM tespiti** — gateway'in kendi 512 MB container limiti "efektif RAM" sanilip sistemi her zaman `lite` profile dusuruyordu; oncelik artik `HOST_RAM_GB > /proc/meminfo > psutil`, cgroup limiti yalnizca bilgi amacli raporlanir
+- discover'da butce tamamen doluyken (`budget_free=0`) modeller yanlislikla "sigiyor" gorunuyordu
+- `persona` kategorisi API semasina eklendi (UI listeliyordu ama API kabul etmiyordu)
+- Replan sonrasi eski idle-sweep gorevleri iptal edilmeden birikiyordu (task sizintisi)
+- HF tag'lerinden uretilen `model_id` 64 karakter sinirina ve `/` karakterine uygun normalize edilir
+
+### Changed
+- `docker-compose.yml`: `JWT_SECRET` artik zorunlu degil (`:?` kaldirildi)
+- `.env.example` ve preflight mesajlari otomatik secret uretimini yansitir
+
 ## [0.5.0] - 2026-06-03
 
 Donanim-farkindalikli dinamik model havuzu + admin kategori yonetimi.

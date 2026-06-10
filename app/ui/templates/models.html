@@ -32,6 +32,29 @@
   </div>
 </section>
 
+<section class="card" style="margin-bottom:1rem;" id="remoteSection">
+  <div class="page-header" style="margin-bottom:0.5rem;">
+    <div>
+      <h2 style="margin:0;">Canli kesif — guncel modeller</h2>
+      <div class="subtitle" id="remoteMeta">ollama.com + HuggingFace'ten otomatik cekilir; yeni model ciktiginda guncelleme gerekmez.</div>
+    </div>
+    <div class="actions">
+      <button id="remoteRefreshBtn" class="ghost">Listeyi guncelle</button>
+    </div>
+  </div>
+  <div class="filter-row" id="remoteProviderFilter">
+    <button data-prov="" class="active">Tum kaynaklar</button>
+    <button data-prov="ollama">Ollama Library</button>
+    <button data-prov="huggingface">HuggingFace GGUF</button>
+  </div>
+  <div class="filter-row" id="remoteFitFilter">
+    <button data-fit="" class="active">Hepsi</button>
+    <button data-fit="recommended">Donanima onerilen</button>
+    <button data-fit="fits">Butceye sigan</button>
+  </div>
+  <div id="remoteGrid" class="model-grid" style="margin-top:0.6rem;"></div>
+</section>
+
 <div id="accordion" class="accordion"></div>
 
 <!-- Modal template for custom add will be created on demand by JS -->

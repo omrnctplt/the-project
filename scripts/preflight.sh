@@ -21,7 +21,7 @@ hdr "Konfigurasyon dosyalari"
 if [ ! -f .env ]; then
   warn ".env dosyasi yok — .env.example'dan kopyalaniyor"
   cp .env.example .env
-  ok ".env olusturuldu (JWT_SECRET'i URETIM'de mutlaka degistirin)"
+  ok ".env olusturuldu (JWT_SECRET bos birakilirsa sistem otomatik uretir)"
 else
   ok ".env mevcut"
 fi
