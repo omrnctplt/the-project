@@ -87,3 +87,22 @@ def test_fallback_when_target_not_available():
     decision = r.decide("engineering", "```js\nconsole.log(1)\n```")
     assert decision.fallback_triggered
     assert decision.model_id == "fb"
+
+
+def test_category_assignment_overrides_default_selection():
+    # Admin 'code' kategorisine txt-1'i atar; katalogda txt-1 aslinda 'text'.
+    # Router code'a yonlenince code-1 yerine atanan txt-1'i secmeli.
+    orch = _orch({"txt-1": "ready", "code-1": "ready", "fb": "ready"})
+    r = Router(CATALOG, orch, category_assignments={"code": ["txt-1"]})
+    decision = r.decide("engineering", "```python\nprint(1)\n```")
+    assert decision.category == "code"
+    assert decision.model_id == "txt-1"
+
+
+def test_category_assignment_falls_back_when_assigned_not_ready():
+    # 'code' yalnizca code-1'e atanmis ama code-1 yok; fallback devreye girer.
+    orch = _orch({"fb": "ready"})
+    r = Router(CATALOG, orch, category_assignments={"code": ["code-1"]})
+    decision = r.decide("engineering", "```python\nprint(1)\n```")
+    assert decision.fallback_triggered
+    assert decision.model_id == "fb"

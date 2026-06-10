@@ -20,6 +20,7 @@
   --accent-2:    #93b5ff;
   --accent-soft: rgba(110, 155, 255, 0.12);
   --accent-glow: rgba(110, 155, 255, 0.25);
+  --on-accent:   #0a0c11;
 
   --violet:      #a06bff;
   --teal:        #5ee3c7;
@@ -43,6 +44,53 @@
   --mono: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
   --sans: ui-sans-serif, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
+
+/* =============================================
+   Light tema paleti
+   ============================================= */
+[data-theme="light"] {
+  --bg:           #f6f7f9;
+  --bg-elev:      #ffffff;
+  --surface:      #ffffff;
+  --surface-2:    #f1f3f7;
+  --surface-3:    #e7ebf1;
+  --border:       #e2e6ee;
+  --border-soft:  #edf0f5;
+  --border-strong:#d2d8e3;
+
+  --text:        #1a1e27;
+  --text-soft:   #3f4654;
+  --muted:       #6a7283;
+  --muted-2:     #9aa2b1;
+
+  --accent:      #3f6ef0;
+  --accent-2:    #2f5ad8;
+  --accent-soft: rgba(63, 110, 240, 0.10);
+  --accent-glow: rgba(63, 110, 240, 0.18);
+
+  --violet:      #7c3aed;
+  --teal:        #0d9488;
+
+  --ok:          #16a34a;
+  --ok-soft:     rgba(22, 163, 74, 0.12);
+  --warn:        #c2740a;
+  --warn-soft:   rgba(217, 119, 6, 0.14);
+  --danger:      #dc2626;
+  --danger-soft: rgba(220, 38, 38, 0.10);
+
+  --on-accent:   #ffffff;
+  --shadow-1:  0 1px 0 rgba(255,255,255,0.7) inset, 0 1px 2px rgba(20,30,60,0.06);
+  --shadow-2:  0 12px 28px rgba(20,30,60,0.12), 0 2px 6px rgba(20,30,60,0.06);
+
+  color-scheme: light;
+}
+[data-theme="light"] body {
+  background:
+    radial-gradient(900px 500px at 80% -10%, rgba(63,110,240,0.05), transparent 60%),
+    radial-gradient(700px 400px at -10% 110%, rgba(124,58,237,0.04), transparent 60%),
+    var(--bg);
+}
+[data-theme="light"] table.data th { background: rgba(20,30,60,0.04); }
 
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
@@ -381,7 +429,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 button.primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #0a0c11;
+  color: var(--on-accent);
   font-weight: 600;
 }
 button.primary:hover { background: var(--accent-2); border-color: var(--accent-2); }
@@ -903,15 +951,143 @@ body.page-chat .main-area > main {
   font-size: 0.92rem;
   line-height: 1.6;
   color: var(--text);
-  white-space: pre-wrap;
   word-wrap: break-word;
+  overflow-wrap: anywhere;
 }
-.msg.user .content { color: var(--text-soft); }
+.msg.user .content { color: var(--text-soft); white-space: pre-wrap; }
 .msg .content.streaming::after {
   content: "▌";
   color: var(--accent);
   animation: blink 1s steps(2) infinite;
   margin-left: 0.1rem;
+}
+
+/* Markdown render edilen asistan icerigi */
+.msg.assistant .content > *:first-child { margin-top: 0; }
+.msg.assistant .content > *:last-child { margin-bottom: 0; }
+.msg.assistant .content p { margin: 0.55rem 0; }
+.msg.assistant .content h1,
+.msg.assistant .content h2,
+.msg.assistant .content h3,
+.msg.assistant .content h4 {
+  margin: 0.9rem 0 0.45rem;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+.msg.assistant .content h1 { font-size: 1.2rem; }
+.msg.assistant .content h2 { font-size: 1.05rem; }
+.msg.assistant .content h3 { font-size: 0.95rem; }
+.msg.assistant .content h4 { font-size: 0.88rem; color: var(--text-soft); }
+.msg.assistant .content ul,
+.msg.assistant .content ol { margin: 0.5rem 0; padding-left: 1.4rem; }
+.msg.assistant .content li { margin: 0.2rem 0; }
+.msg.assistant .content blockquote {
+  margin: 0.6rem 0;
+  padding: 0.3rem 0.9rem;
+  border-left: 3px solid var(--border-strong);
+  color: var(--text-soft);
+}
+.msg.assistant .content a { color: var(--accent-2); text-decoration: underline; text-underline-offset: 2px; }
+.msg.assistant .content code {
+  font-family: var(--mono);
+  background: var(--surface-2);
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.85em;
+  border: 1px solid var(--border-soft);
+}
+
+/* Kod blogu (kopyala butonlu) */
+.code-block {
+  margin: 0.7rem 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--bg-elev);
+}
+.code-block .code-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.3rem 0.6rem;
+  background: rgba(0,0,0,0.25);
+  border-bottom: 1px solid var(--border-soft);
+}
+.code-block .code-lang {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+.code-block .copy-code {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-soft);
+  padding: 0.15rem 0.5rem;
+  font-size: 0.7rem;
+  border-radius: 5px;
+}
+.code-block .copy-code:hover { background: var(--surface-2); color: var(--text); }
+.code-block .copy-code.copied { color: var(--ok); border-color: rgba(74,222,128,0.4); }
+.code-block pre {
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 0.75rem 0.85rem;
+}
+.code-block pre code {
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-size: 0.82rem;
+  color: var(--text);
+}
+
+/* Mesaj altindaki hizli aksiyonlar */
+.msg-actions {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+  opacity: 0;
+  transition: opacity 150ms;
+}
+.msg:hover .msg-actions,
+.msg:focus-within .msg-actions { opacity: 1; }
+.msg-act {
+  background: transparent;
+  border: 1px solid var(--border-soft);
+  color: var(--muted);
+  font-size: 0.72rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+}
+.msg-act:hover { background: var(--surface-2); color: var(--text); border-color: var(--border); }
+
+/* Gonder butonu "Durdur" moduna gecince */
+#sendBtn.stop {
+  background: var(--danger-soft);
+  border-color: rgba(248,113,113,0.4);
+  color: var(--danger);
+}
+#sendBtn.stop:hover { background: rgba(248,113,113,0.2); }
+
+/* Sohbet bos durum logosu */
+.chat-empty-logo {
+  width: 52px; height: 52px;
+  margin: 0 auto 1rem;
+  border-radius: 14px;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--violet) 100%);
+  position: relative;
+  box-shadow: 0 0 0 1px rgba(110,155,255,0.4), 0 10px 30px rgba(110,155,255,0.3);
+}
+.chat-empty-logo::before {
+  content: "";
+  position: absolute;
+  inset: 11px;
+  border-radius: 7px;
+  background: var(--bg);
 }
 
 .chat-input-area {
@@ -1119,15 +1295,217 @@ body.page-chat .main-area > main {
 }
 
 /* =============================================
-   Responsive
+   Responsive — mobilde sidebar drawer'a doner
    ============================================= */
+.mobile-topbar { display: none; }
+.nav-backdrop { display: none; }
+
 @media (max-width: 900px) {
+  .mobile-topbar {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    padding: 0 0.9rem;
+    height: 52px;
+    background: var(--bg-elev);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 60;
+  }
+  .mobile-topbar .hamburger {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 1.05rem;
+    padding: 0.3rem 0.6rem;
+    line-height: 1;
+  }
+  .mobile-topbar .mt-brand {
+    font-weight: 600;
+    font-size: 0.95rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .mobile-topbar .mt-logo {
+    width: 20px; height: 20px;
+    border-radius: 6px;
+    background: linear-gradient(135deg, var(--accent), var(--violet));
+    position: relative;
+    flex-shrink: 0;
+  }
+  .mobile-topbar .mt-logo::before {
+    content: ""; position: absolute; inset: 4px;
+    border-radius: 3px; background: var(--bg-elev);
+  }
+
   .app-shell, .chat-shell { grid-template-columns: 1fr; }
-  .sidebar, .chat-sidebar { position: relative; height: auto; border-right: none; border-bottom: 1px solid var(--border); }
-  .sidebar { padding: 0.5rem 0.75rem; flex-direction: row; gap: 0.5rem; align-items: center; overflow-x: auto; }
-  .sidebar .brand { border: none; margin: 0; padding: 0; }
-  .sidebar .nav-section { flex-direction: row; }
-  .sidebar .nav-section .title { display: none; }
-  .sidebar .spacer, .sidebar .footer-mini, .sidebar .user-card { display: none; }
-  .chat-sidebar { max-height: 200px; }
+
+  .sidebar {
+    position: fixed;
+    top: 0; left: 0;
+    height: 100vh;
+    width: 264px;
+    transform: translateX(-100%);
+    transition: transform 220ms ease;
+    z-index: 95;
+    box-shadow: var(--shadow-2);
+    overflow-y: auto;
+  }
+  .sidebar.open { transform: translateX(0); }
+
+  .nav-backdrop {
+    display: block;
+    position: fixed; inset: 0;
+    background: rgba(10,12,17,0.55);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    z-index: 94;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 220ms;
+  }
+  .nav-backdrop.show { opacity: 1; pointer-events: auto; }
+
+  .main-area > main { padding: 1rem 1rem 2rem; }
+
+  /* Chat mobilde: tek kolon, sohbet listesi ustte daraltilmis */
+  body.page-chat .main-area > main { height: calc(100vh - 53px); }
+  .chat-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+    height: 100%;
+  }
+  .chat-sidebar {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    max-height: 28vh;
+  }
+  .chat-body { padding: 1rem 1rem 7rem; }
+  .page-header { gap: 0.5rem; }
+}
+
+/* Dusuk guclu cihaz: pahali blur efektlerini kapat */
+.reduce-fx .modal-backdrop,
+.reduce-fx .bootstrap-overlay,
+.reduce-fx .nav-backdrop {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* =============================================
+   Mini grafikler (donut / bar / sparkline)
+   ============================================= */
+.donut-wrap { display: flex; align-items: center; justify-content: center; padding: 0.4rem 0; }
+.donut-svg { width: 130px; height: 130px; }
+.donut-track { fill: none; stroke: var(--surface-3); stroke-width: 9; }
+.donut-val { fill: none; stroke-width: 9; stroke-linecap: round; transition: stroke-dashoffset 700ms ease; }
+.donut-label { fill: var(--text); font-size: 15px; font-weight: 700; text-anchor: middle; font-family: var(--sans); }
+.donut-sub { fill: var(--muted); font-size: 6.5px; text-anchor: middle; font-family: var(--sans); }
+
+.cbar-row {
+  display: grid;
+  grid-template-columns: 92px 1fr auto;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.45rem 0;
+  font-size: 0.8rem;
+}
+.cbar-label { color: var(--text-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cbar-track { background: var(--bg-elev); border: 1px solid var(--border-soft); border-radius: 999px; height: 8px; overflow: hidden; }
+.cbar-fill { height: 100%; border-radius: 999px; transition: width 700ms ease; }
+.cbar-val { color: var(--text); font-variant-numeric: tabular-nums; font-size: 0.78rem; min-width: 1.5rem; text-align: right; }
+
+.spark { width: 100%; height: 38px; display: block; }
+.spark-line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.spark-area { fill: var(--accent-soft); stroke: none; }
+
+.chart-card h3 { margin-top: 0; }
+
+/* Yukleme iskeleti (skeleton shimmer) */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface-2);
+  border-radius: 6px;
+  color: transparent !important;
+  min-height: 1em;
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.07), transparent);
+  animation: shimmer 1.3s infinite;
+}
+@keyframes shimmer { 100% { transform: translateX(100%); } }
+
+/* =============================================
+   Tema degistirme butonu
+   ============================================= */
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  justify-content: flex-start;
+  background: transparent;
+  border: 1px solid var(--border-soft);
+  color: var(--text-soft);
+  padding: 0.45rem 0.7rem;
+  font-size: 0.8rem;
+  margin-top: 0.25rem;
+}
+.theme-toggle:hover { background: var(--surface-2); color: var(--text); }
+.theme-toggle .ico { font-size: 1rem; line-height: 1; }
+
+/* =============================================
+   Erisilebilirlik: gorunur odak halkalari
+   ============================================= */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+a:focus-visible,
+button:focus-visible,
+.nav-item:focus-visible,
+.ex-card:focus-visible,
+summary:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+/* Form alanlari kendi odak stiline sahip; cift halka olmasin */
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible { outline: none; }
+
+/* =============================================
+   Hareket azaltma tercihi
+   ============================================= */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ---------- Dokunmatik + mobil saglamlik duzeltmeleri ---------- */
+@media (pointer: coarse) {
+  .chat-sidebar .conv .del,
+  .msg-actions { opacity: 1; }
+}
+@media (max-width: 900px) {
+  .card { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .chat-main { min-height: 0; }
+}
+@supports (height: 100dvh) {
+  @media (max-width: 900px) {
+    .app-shell { min-height: 100dvh; }
+  }
 }

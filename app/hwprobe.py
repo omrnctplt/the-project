@@ -1,10 +1,13 @@
 """Donanim kesfi — CPU, RAM, GPU/VRAM, disk.
 
-Container icinden cagrilir. Oncelik sirasi:
+Container icinden cagrilir. RAM icin oncelik sirasi:
   1. HOST_RAM_GB env var (kullanici manuel belirtti)
-  2. cgroup v2/v1 memory limit (Docker resource limit)
-  3. /proc/meminfo MemTotal (WSL2 / Linux host)
-  4. psutil.virtual_memory().total
+  2. /proc/meminfo MemTotal (WSL2 / Linux host)
+  3. psutil.virtual_memory().total
+
+Gateway'in kendi cgroup limiti (GATEWAY_MEM_LIMIT) bilgi amacli raporlanir
+ama efektif RAM hesabina KATILMAZ: modeller ayri bir container'da (ollama)
+calisir, gateway'in 512 MB limiti model butcesini temsil etmez.
 Sonuc /data/hw_profile.json'a yazilir.
 """
 
@@ -21,7 +24,11 @@ from typing import Any
 
 import psutil
 
+from .config import DATA_DIR
+
 log = logging.getLogger(__name__)
+
+HW_PROFILE_PATH = DATA_DIR / "hw_profile.json"
 
 
 def _read_cgroup_mem_limit_gb() -> float | None:
@@ -192,17 +199,12 @@ def detect_memory() -> dict[str, Any]:
     meminfo = _read_proc_meminfo() or {}
     override = _read_host_ram_override_gb()
 
-    candidates: list[tuple[str, float]] = []
     if override:
-        candidates.append(("HOST_RAM_GB override", override))
-    if cgroup_limit:
-        candidates.append(("cgroup limit", cgroup_limit))
-    if meminfo.get("MemTotal"):
-        candidates.append(("/proc/meminfo MemTotal", round(meminfo["MemTotal"], 2)))
-    candidates.append(("psutil", psutil_total))
-
-    effective = min(v for _, v in candidates)
-    source = next(name for name, v in candidates if v == effective)
+        effective, source = override, "HOST_RAM_GB override"
+    elif meminfo.get("MemTotal"):
+        effective, source = round(meminfo["MemTotal"], 2), "/proc/meminfo MemTotal"
+    else:
+        effective, source = psutil_total, "psutil"
 
     available = psutil_avail
     if "MemAvailable" in meminfo:
@@ -218,8 +220,8 @@ def detect_memory() -> dict[str, Any]:
     }
 
 
-def detect_disk(path: str = "/data") -> dict[str, Any]:
-    target = path if Path(path).exists() else "/"
+def detect_disk(path: str | Path = DATA_DIR) -> dict[str, Any]:
+    target = str(path) if Path(path).exists() else "/"
     du = psutil.disk_usage(target)
     return {
         "path": target,
@@ -244,21 +246,11 @@ def probe() -> dict[str, Any]:
     }
 
 
-def write_profile(profile: dict[str, Any], path: str | Path = "/data/hw_profile.json") -> Path:
+def write_profile(profile: dict[str, Any], path: str | Path = HW_PROFILE_PATH) -> Path:
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(json.dumps(profile, indent=2, ensure_ascii=False))
     return p
-
-
-def load_profile(path: str | Path = "/data/hw_profile.json") -> dict[str, Any] | None:
-    p = Path(path)
-    if not p.exists():
-        return None
-    try:
-        return json.loads(p.read_text())
-    except (OSError, json.JSONDecodeError):
-        return None
 
 
 if __name__ == "__main__":

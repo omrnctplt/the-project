@@ -179,3 +179,16 @@ class OllamaClient:
             )
         except httpx.HTTPError as exc:
             log.warning("Unload basarisiz [%s]: %s", model_tag, exc)
+
+    async def delete(self, model_tag: str) -> bool:
+        """Modeli Ollama'dan tamamen siler (disk bosalir). /api/delete."""
+        try:
+            r = await self._client.request(
+                "DELETE", "/api/delete",
+                json={"model": model_tag},
+                timeout=httpx.Timeout(30.0),
+            )
+            return r.status_code < 400
+        except httpx.HTTPError as exc:
+            log.warning("Delete basarisiz [%s]: %s", model_tag, exc)
+            return False

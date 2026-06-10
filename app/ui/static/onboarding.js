@@ -1,4 +1,5 @@
 (async function () {
+  const isAdmin = (window.currentUser || {}).role === "admin";
   // HW + budget
   let profile = null;
   try {
@@ -34,24 +35,36 @@
   const filter = document.getElementById("recCatFilter");
   let currentCat = "";
 
+  const recHint = document.getElementById("recHint");
+  if (recHint) {
+    recHint.textContent = `Donanim sinifiniz: ${(cap.hardware_tier || "?").toUpperCase()} · ${(accel || "?").toUpperCase()}`;
+  }
+
+  if (!isAdmin) {
+    const notice = document.createElement("div");
+    notice.className = "card";
+    notice.style.cssText = "margin:0.75rem 0 1rem; border-left:3px solid var(--warn);";
+    notice.innerHTML = `
+      <strong>Sistemde henuz kurulu model yok.</strong>
+      <p class="muted" style="margin:0.4rem 0 0.6rem;">Model kurulumu yonetici yetkisi gerektirir.
+      Asagidaki liste donaniminiza uygun modelleri gosterir; kurulum icin yoneticinize iletebilirsiniz.</p>
+      <a href="/ui/dashboard" class="nav-item" style="display:inline-block;">Panele don →</a>`;
+    list.parentElement.insertBefore(notice, list);
+  }
+
   function render() {
     list.innerHTML = "";
-    const items = (recs.models || []).filter(m =>
-      !currentCat || m.category === currentCat
-    );
-    // Once sigan + kategori bazli ekleyelim
-    items.sort((a, b) => a.approx_gb - b.approx_gb);
-    let recommendedFlagged = false;
+    // Backend zaten onerilenleri basa koydu; kategori filtresi uygula
+    const items = (recs.models || []).filter(m => !currentCat || m.category === currentCat);
     for (const m of items) {
-      const fits = m.approx_gb <= maxFit + 0.01;
+      const fits = m.fits;
       const card = document.createElement("div");
       let cls = "model-card";
-      if (m.in_catalog) cls += " in-catalog";
+      if (m.recommended) cls += " in-catalog";
       if (fits) cls += " fits-current";
       card.className = cls;
-      const recBadge = (!recommendedFlagged && fits && m.category === "fallback")
-        ? '<span class="badge ok">onerilen baslangic</span>' : "";
-      if (recBadge) recommendedFlagged = true;
+      const recBadge = m.recommended ? '<span class="badge ok">donaniminiza onerilen</span>' : "";
+      const srcBadge = m.source === "huggingface" ? '<span class="badge busy">HF</span>' : "";
       card.innerHTML = `
         <div class="head">
           <div>
@@ -63,15 +76,20 @@
         <div class="blurb">${escapeHtml(m.blurb || "")}</div>
         <div class="meta">
           <span class="badge plain">~${m.approx_gb} GB</span>
+          <span class="badge plain">${escapeHtml(m.tier)}</span>
           ${fits ? '<span class="badge ok">butceye sigar</span>' : '<span class="badge warn">butce yetersiz</span>'}
-          ${m.in_catalog ? '<span class="badge busy">katalogda</span>' : ''}
+          ${srcBadge}
           ${recBadge}
         </div>
         <div class="actions">
-          <button class="primary" data-tag="${escapeHtml(m.tag)}" data-cat="${m.category}" data-gb="${m.approx_gb}" data-label="${escapeHtml(m.label)}" ${fits ? "" : "disabled"}>
-            ${m.in_catalog ? "Pull et" : "Ekle ve pull et"}
+          ${isAdmin ? `
+          <button class="primary" data-tag="${escapeHtml(m.tag)}" data-mid="${escapeHtml(m.model_id || "")}" data-cat="${m.category}" data-gb="${m.approx_gb}" data-label="${escapeHtml(m.label)}" ${fits ? "" : "disabled"}>
+            ${m.pulled ? "Indirilmis ✓" : "Ekle ve pull et"}
           </button>
           <button data-skip="1" class="ghost">Atlat</button>
+          ` : `
+          <span class="muted" style="font-size:0.78rem;">${m.pulled ? "Kurulu ✓" : "Kurulum yonetici yetkisi gerektirir"}</span>
+          `}
         </div>`;
       list.appendChild(card);
     }
@@ -100,9 +118,9 @@
     const original = btn.textContent;
     btn.textContent = "Ekleniyor...";
     try {
-      // Generate ID from tag
       const tag = btn.dataset.tag;
-      const modelId = tag.replace(/[:.]/g, "-").replace(/[^a-zA-Z0-9._\-]/g, "");
+      // Katalogdaki gercek id'yi kullan; yoksa ortak kuralla turet (mukerrer kayit onlenir)
+      const modelId = btn.dataset.mid || tagToModelId(tag);
       const category = btn.dataset.cat;
       const ram = parseFloat(btn.dataset.gb);
       // Try add to catalog (idempotent — if exists, just pull)

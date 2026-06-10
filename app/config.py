@@ -98,6 +98,10 @@ def default_runtime_config() -> dict[str, Any]:
         "active_models": [],
         "manual_override": False,
         "first_run_complete": False,
+        # Admin'in kategori -> model_id listesi atamasi. Bos ise router
+        # modelin katalog kategorisine gore secer. Doluysa o kategoride
+        # SADECE atanan modeller kullanilir.
+        "category_assignments": {},
     }
 
 

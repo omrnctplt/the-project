@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}KVKK Aydinlatma Metni{% endblock %}
+{% block body_class %}public-page{% endblock %}
+{% block shell %}
+<div class="login-shell" style="align-items:flex-start; overflow-y:auto; padding:2rem 1rem;">
+  <div class="card" style="max-width:760px; margin:0 auto; position:relative; z-index:1;">
+    <h1>Kisisel Verilerin Korunmasi — Aydinlatma Metni</h1>
+    <p class="muted">6698 sayili Kisisel Verilerin Korunmasi Kanunu ("KVKK") m.10 kapsaminda hazirlanmistir.</p>
+
+    <h2>1. Veri sorumlusu</h2>
+    <p>Inference Hub, kurumunuzun kendi altyapisinda (on-premise) calisan bir yapay zeka erisim katmanidir.
+    Veri sorumlusu, sistemi isleten kurumunuzdur. Hicbir veri kurum disindaki bir sunucuya gonderilmez.</p>
+
+    <h2>2. Islenen kisisel veriler</h2>
+    <ul>
+      <li><strong>Kimlik / kurumsal bilgiler:</strong> kullanici adi, ad-soyad etiketi, departman, rol.</li>
+      <li><strong>Islem guvenligi kayitlari (denetim):</strong> istek zamani, kullanilan model, istegin
+        <em>SHA-256 ozeti (hash)</em> ve karakter uzunlugu, yanit suresi, token sayilari.
+        <strong>Yazdiginiz metnin icerigi saklanmaz</strong> — yalnizca geri donusturulemez ozeti tutulur.</li>
+      <li><strong>Kullanim istatistikleri:</strong> gun bazinda istek/token sayilari (kapasite planlamasi icin).</li>
+      <li><strong>Oturum bilgisi:</strong> tarayicinizda saklanan, en fazla 8 saat gecerli oturum anahtari (JWT).
+        IP adresi veya konum bilgisi kaydedilmez.</li>
+    </ul>
+
+    <h2>3. Isleme amaclari ve hukuki sebep</h2>
+    <p>Veriler; hizmetin sunulmasi, sistem guvenliginin saglanmasi, kapasite planlamasi ve mevzuattan dogan
+    yukumlulukler icin, KVKK m.5/2 (c) sozlesmenin ifasi ve (f) mesru menfaat hukuki sebeplerine dayanarak islenir.</p>
+
+    <h2>4. Saklama suresi</h2>
+    <p>Denetim ve kullanim kayitlari varsayilan olarak <strong>{{ retention_days }} gun</strong> sonra otomatik ve
+    geri donusumsuz olarak silinir. Bu sure sistem yoneticisi tarafindan kurumsal politikaya gore ayarlanabilir.</p>
+
+    <h2>5. Aktarim</h2>
+    <p>Sistem tamamen kurum ici calisir; kisisel veriler yurt ici veya yurt disi ucuncu taraflara aktarilmaz.
+    Model kesfi ozelligi yalnizca herkese acik model kataloglarini indirir; disari hicbir kullanici verisi gondermez.</p>
+
+    <h2>6. Haklariniz (KVKK m.11)</h2>
+    <p>Verilerinizin islenip islenmedigini ogrenme, duzeltilmesini veya silinmesini isteme haklarina sahipsiniz.
+    Silme talepleri sistem yoneticisi tarafindan tek islemle yerine getirilir (denetim + kullanim kayitlarinin
+    tamami kalici olarak silinir). Basvurularinizi kurumunuzun veri sorumlusu irtibat kisisine iletebilirsiniz.</p>
+
+    <h2>7. Guvenlik tedbirleri</h2>
+    <ul>
+      <li>Parolalar geri donusumsuz <code>bcrypt</code> ozetiyle saklanir.</li>
+      <li>Erisim, rol bazli yetkilendirme (kullanici/yonetici) ve kisa omurlu JWT ile sinirlanir.</li>
+      <li>Istek icerigi yerine yalnizca hash saklanarak veri minimizasyonu uygulanir.</li>
+      <li>Oturum acma denemeleri hiz sinirina tabidir; tum yanitlarda guvenlik basliklari (CSP, X-Frame-Options) bulunur.</li>
+    </ul>
+
+    <div style="margin-top:1.5rem; display:flex; gap:0.75rem;">
+      <a href="/ui/login" class="nav-item" style="display:inline-block;">← Giris sayfasina don</a>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}{% endblock %}

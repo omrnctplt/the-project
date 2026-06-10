@@ -1,13 +1,43 @@
 (async function () {
   let timer = null;
+  let failStreak = 0;
+
+  function setOfflineBanner(on, msg) {
+    let b = document.getElementById("resOffline");
+    if (on) {
+      if (!b) {
+        b = document.createElement("div");
+        b.id = "resOffline";
+        b.className = "card";
+        b.style.cssText = "border-left:3px solid var(--error); margin-bottom:0.75rem;";
+        const main = document.querySelector("main") || document.body;
+        main.insertBefore(b, main.firstChild);
+      }
+      b.innerHTML = `<strong>Kaynak verisi alinamiyor.</strong> <span class="muted">${escapeHtml(msg || "")} — otomatik yeniden denenecek.</span>`;
+    } else if (b) {
+      b.remove();
+    }
+  }
 
   async function refresh() {
     try {
       const r = await api("/api/v1/system/resources");
+      if (failStreak >= 3) restartTimer(5000);
+      failStreak = 0;
+      setOfflineBanner(false);
       render(r);
     } catch (e) {
-      toast("Kaynak verisi alinamadi: " + e.message, "error");
+      failStreak++;
+      if (failStreak === 1) toast("Kaynak verisi alinamadi: " + e.message, "error");
+      setOfflineBanner(true, e.message);
+      if (failStreak === 3) restartTimer(20000);
     }
+  }
+
+  function restartTimer(ms) {
+    if (!timer) return;
+    clearInterval(timer);
+    timer = setInterval(refresh, ms);
   }
 
   function render(d) {

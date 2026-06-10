@@ -5,7 +5,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#0a0c11" />
   <title>{% block title %}Inference Hub{% endblock %} · Inference Hub</title>
-  <link rel="stylesheet" href="/static/style.css" />
+  <script>
+    /* FOUC onleme: tema tercihini stylesheet'ten once uygula */
+    (function () {
+      try {
+        var pref = localStorage.getItem("hub_theme") || "auto";
+        var dark = pref === "dark" ||
+          (pref === "auto" && window.matchMedia &&
+           window.matchMedia("(prefers-color-scheme: dark)").matches);
+        var root = document.documentElement;
+        root.setAttribute("data-theme", dark ? "dark" : "light");
+        root.setAttribute("data-theme-pref", pref);
+      } catch (e) {}
+    })();
+  </script>
+  <link rel="stylesheet" href="/static/style.css?v={{ app_version }}" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%236e9bff'/%3E%3Crect x='8' y='8' width='16' height='16' rx='3' fill='%230a0c11'/%3E%3C/svg%3E" />
 </head>
 <body class="{% block body_class %}{% endblock %}">
@@ -14,7 +28,7 @@
     <aside class="sidebar" id="mainSidebar">
       <div class="brand">
         <div class="logo" aria-hidden="true"></div>
-        <div class="name">Inference Hub<span class="dim">v0.3.0</span></div>
+        <div class="name">Inference Hub<span class="dim">v{{ app_version }}</span></div>
       </div>
 
       <div class="user-card" id="userCard"></div>
@@ -34,14 +48,24 @@
 
       <div class="spacer"></div>
 
+      <button class="theme-toggle" id="themeToggle" type="button" aria-label="Tema degistir" title="Tema degistir">
+        <span class="ico" aria-hidden="true"></span>
+        <span class="lbl">Tema</span>
+      </button>
+
       <div class="footer-mini">
         <a href="/docs" target="_blank" rel="noopener">API · OpenAPI</a>
         <a href="http://localhost:3000" target="_blank" rel="noopener">Grafana</a>
         <a href="http://localhost:9090" target="_blank" rel="noopener">Prometheus</a>
+        <a href="/ui/privacy">KVKK</a>
       </div>
     </aside>
 
     <div class="main-area">
+      <div class="mobile-topbar">
+        <button class="hamburger" id="navToggle" type="button" aria-label="Menuyu ac/kapat" aria-expanded="false" aria-controls="mainSidebar">☰</button>
+        <div class="mt-brand"><span class="mt-logo" aria-hidden="true"></span> Inference Hub</div>
+      </div>
       <main>
         {% block content %}{% endblock %}
       </main>
@@ -49,10 +73,11 @@
   </div>
   {% endblock %}
 
+  <div class="nav-backdrop" id="navBackdrop"></div>
   <div id="toast-area"></div>
 
-  <script src="/static/bootstrap.js"></script>
-  <script src="/static/common.js"></script>
+  <script src="/static/bootstrap.js?v={{ app_version }}"></script>
+  <script src="/static/common.js?v={{ app_version }}"></script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

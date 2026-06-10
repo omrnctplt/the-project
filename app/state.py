@@ -68,9 +68,6 @@ class BootstrapTracker:
             step.detail = detail
         step.finished_at = time.time()
 
-    def all_done(self) -> bool:
-        return all(s.status in ("ok", "warn", "skipped", "error") for s in self.steps)
-
     def overall_status(self) -> str:
         if any(s.status == "error" for s in self.steps):
             return "error"
@@ -102,4 +99,5 @@ class AppState:
     router: Router | None = None
     ready: bool = False
     tasks: list[asyncio.Task] = field(default_factory=list)
+    sweep_task: asyncio.Task | None = None
     bootstrap: BootstrapTracker = field(default_factory=BootstrapTracker)

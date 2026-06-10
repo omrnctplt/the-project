@@ -18,7 +18,7 @@ Hdr "Konfigurasyon dosyalari"
 if (-not (Test-Path .env)) {
     Warn ".env yok - .env.example'dan kopyalaniyor"
     Copy-Item .env.example .env
-    Ok ".env olusturuldu (URETIM'de JWT_SECRET'i degistirin)"
+    Ok ".env olusturuldu (JWT_SECRET bos birakilirsa sistem otomatik uretir)"
 } else {
     Ok ".env mevcut"
 }

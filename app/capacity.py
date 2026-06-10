@@ -20,7 +20,7 @@ from typing import Any
 
 log = logging.getLogger(__name__)
 
-CATEGORY_PRIORITY = ("fallback", "text", "code", "reasoning")
+CATEGORY_PRIORITY = ("fallback", "text", "code", "reasoning", "persona")
 
 PROFILES: dict[str, dict[str, Any]] = {
     "lite": {
@@ -47,7 +47,7 @@ PROFILES: dict[str, dict[str, Any]] = {
         "max_active": 6,
         "max_loaded_models": 2,
         "num_parallel": 2,
-        "allowed_categories": ["fallback", "text", "code", "reasoning"],
+        "allowed_categories": ["fallback", "text", "code", "reasoning", "persona"],
         "label": "Performance (GPU / yuksek RAM)",
     },
 }
@@ -64,6 +64,7 @@ class CapacityPlan:
     profile_auto: bool
     budget_total_gb: float
     budget_used_gb: float
+    hardware_tier: str = "laptop"
     active_models: list[str] = field(default_factory=list)
     passive_models: list[str] = field(default_factory=list)
     max_concurrent_requests: int = 1
@@ -77,6 +78,7 @@ class CapacityPlan:
     def to_dict(self) -> dict[str, Any]:
         return {
             "accelerator": self.accelerator,
+            "hardware_tier": self.hardware_tier,
             "profile": self.profile,
             "profile_label": self.profile_label,
             "profile_auto": self.profile_auto,
@@ -108,6 +110,32 @@ def _accelerator_and_total(hw: dict[str, Any]) -> tuple[str, float]:
     mem = hw.get("memory") or {}
     total = float(mem.get("effective_total_gb") or mem.get("host_total_gb") or 0.0)
     return "cpu", max(total, 1.0)
+
+
+def hardware_tier(hw: dict[str, Any]) -> str:
+    """Donanimi bir tier'a yerlestirir: edge / laptop / workstation / datacenter.
+
+    Discover/onerme bu tier'a gore yapilir. GPU'da VRAM, GPU yoksa RAM baz alinir.
+    """
+    accel, total = _accelerator_and_total(hw)
+    if accel == "gpu":
+        if total >= 48:
+            return "datacenter"
+        if total >= 16:
+            return "workstation"
+        if total >= 6:
+            return "laptop"
+        return "edge"
+    # CPU-only: datacenter pratik degil; buyuk RAM en fazla workstation
+    if total >= 64:
+        return "workstation"
+    if total >= 16:
+        return "laptop"
+    return "edge"
+
+
+# Tier siralamasi — komsu tier onerileri ve karsilastirma icin
+TIER_ORDER = ("edge", "laptop", "workstation", "datacenter")
 
 
 def auto_select_profile(hw: dict[str, Any]) -> str:
@@ -220,6 +248,7 @@ def plan(
 
     plan_obj = CapacityPlan(
         accelerator=accelerator,
+        hardware_tier=hardware_tier(hw_profile),
         profile=profile_name,
         profile_label=str(profile_cfg["label"]),
         profile_auto=profile_auto,

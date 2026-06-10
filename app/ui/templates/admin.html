@@ -13,6 +13,7 @@
 
 <div class="tabs">
   <button data-tab="settings" class="active">Calisma profili</button>
+  <button data-tab="categories">Kategori atamasi</button>
   <button data-tab="users">Kullanicilar</button>
   <button data-tab="usage">Kullanim</button>
   <button data-tab="audit">Denetim kaydi</button>
@@ -58,6 +59,17 @@
   </div>
 </div>
 
+<div class="tab-panel" data-panel="categories">
+  <div class="card">
+    <h2>Kategori → model atamasi</h2>
+    <p class="muted">Her amac icin hangi modellerin kullanilacagini secin. <strong>Bos birakirsaniz</strong> sistem, modelin kendi kategorisine gore otomatik secer. Bir kategoriye model atadiginizda, router o amactaki istekleri <strong>yalnizca secili modellere</strong> yonlendirir. Modeller indirilmemisse once Modeller sayfasindan pull edin.</p>
+    <div id="catAssignList"></div>
+    <div style="margin-top:1rem;">
+      <button id="saveCatAssign" class="primary">Atamalari kaydet</button>
+    </div>
+  </div>
+</div>
+
 <div class="tab-panel" data-panel="users">
   <div class="card">
     <h2>Kullanicilar</h2>
@@ -98,5 +110,5 @@
 </div>
 {% endblock %}
 {% block scripts %}
-<script src="/static/admin.js"></script>
+<script src="/static/admin.js?v={{ app_version }}"></script>
 {% endblock %}

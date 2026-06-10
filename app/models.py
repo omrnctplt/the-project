@@ -25,10 +25,16 @@ class TokenResponse(_Base):
     expires_in: int
 
 
+class ChatTurn(_Base):
+    role: str = Field(..., pattern="^(user|assistant)$")
+    content: str = Field(..., min_length=1, max_length=8192)
+
+
 class ChatRequest(_Base):
     prompt: str = Field(..., min_length=1, max_length=8192)
     temperature: float | None = Field(default=None, ge=0.0, le=2.0)
     model_id: str | None = None     # admin override; siradan kullanici icin yok sayilir
+    history: list[ChatTurn] | None = Field(default=None, max_length=20)
 
 
 class ChatResponse(_Base):
@@ -45,19 +51,17 @@ class ChatResponse(_Base):
 
 class PasswordChangeRequest(_Base):
     current_password: str = Field(..., min_length=1, max_length=256)
-    new_password: str = Field(..., min_length=6, max_length=256)
+    new_password: str = Field(..., min_length=8, max_length=256)
 
 
-class ChatStreamRequest(_Base):
-    prompt: str = Field(..., min_length=1, max_length=8192)
-    temperature: float | None = Field(default=None, ge=0.0, le=2.0)
-    model_id: str | None = None
+class ChatStreamRequest(ChatRequest):
+    pass
 
 
 class CatalogModelRequest(_Base):
     model_id: str = Field(..., min_length=1, max_length=64, pattern=r"^[a-zA-Z0-9._\-]+$")
     ollama_tag: str = Field(..., min_length=1, max_length=128)
-    category: str = Field(..., pattern="^(text|code|reasoning|fallback)$")
+    category: str = Field(..., pattern="^(text|code|reasoning|persona|fallback)$")
     parameters_b: float | None = Field(default=None, ge=0.0, le=1000.0)
     ram_gb: float = Field(..., gt=0.0, le=512.0)
     vram_gb: float | None = Field(default=None, gt=0.0, le=512.0)
@@ -72,6 +76,7 @@ class ConfigUpdateRequest(_Base):
     manual_override: bool | None = None
     auto_pull: bool | None = None
     idle_unload_minutes: int | None = Field(default=None, ge=1, le=1440)
+    category_assignments: dict[str, list[str]] | None = None
 
 
 class SystemProfileResponse(_Base):

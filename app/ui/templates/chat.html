@@ -15,6 +15,16 @@
         <label class="checkbox" style="margin:0; font-size:0.8rem;">
           <input type="checkbox" id="streamToggle" checked /> Streaming
         </label>
+        <label style="margin:0; font-size:0.8rem; display:flex; align-items:center; gap:0.35rem;">
+          Yaraticilik
+          <select id="tempSelect" style="width:auto; padding:0.25rem 0.45rem; font-size:0.78rem;" aria-label="Yanit yaraticiligi (temperature)">
+            <option value="">Varsayilan</option>
+            <option value="0.2">Kesin</option>
+            <option value="0.6">Dengeli</option>
+            <option value="1.0">Yaratici</option>
+          </select>
+        </label>
+        <button id="exportBtn" class="small ghost" type="button" title="Sohbeti markdown olarak indir">⤓ Disa aktar</button>
         <select id="adminModel" class="hidden"><option value="">(otomatik)</option></select>
       </div>
     </div>
@@ -32,5 +42,5 @@
 </div>
 {% endblock %}
 {% block scripts %}
-<script src="/static/chat.js"></script>
+<script src="/static/chat.js?v={{ app_version }}"></script>
 {% endblock %}

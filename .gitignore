@@ -1,5 +1,6 @@
 .env
 data/
+data-dev/
 _legacy/
 __pycache__/
 *.pyc
@@ -16,6 +17,7 @@ venv/
 htmlcov/
 .idea/
 .vscode/
+.claude/
 *.log
 *.sqlite
 *.sqlite3
