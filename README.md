@@ -129,7 +129,10 @@ make up
 | `marketing_user` | `mkt123` | marketing | user | light | small |
 | `guest` | `guest` | general | user | light | small |
 
-> Uretim ortaminda `config/default_users.yaml` dosyasini silin veya sifreleri degistirin. `ADMIN_PASSWORD` env var'i ilk seedi override eder.
+> Giris ekranindaki demo tablosuna **tiklayarak** formu otomatik doldurabilirsiniz.
+> `DEMO_MODE=true` iken bu parolalar her acilista tabloya esitlenir — listelenen
+> her hesap her zaman calisir. Uretimde `DEMO_MODE=false` yapin (yalnizca admin
+> olusur, demo listesi gizlenir); `ADMIN_PASSWORD` env var'i admin parolasini belirler.
 
 ---
 
