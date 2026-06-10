@@ -4,7 +4,7 @@
 <div class="page-header">
   <div>
     <h1>Sistem Kaynaklari</h1>
-    <div class="subtitle">Host CPU, bellek, disk + Docker container'lari + en cok tuketen process'ler.</div>
+    <div class="subtitle">Host CPU, bellek, disk, GPU + Docker container'lari + en cok tuketen process'ler.</div>
   </div>
   <div class="actions">
     <label class="checkbox" style="margin:0;"><input type="checkbox" id="autoRefresh" checked /> Otomatik yenile (5sn)</label>
@@ -34,6 +34,8 @@
     <div class="progress" style="margin-top:0.6rem;"><div class="bar" id="vDiskBar"></div></div>
   </div>
 </section>
+
+<section class="grid three" id="gpuSection" style="display:none; margin-bottom:1rem;"></section>
 
 <section class="card" id="containersCard" style="margin-bottom:1rem;">
   <h2>Docker container'lari</h2>

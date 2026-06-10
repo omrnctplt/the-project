@@ -7,3 +7,14 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
+
+  # Gateway'e de GPU erisimi: hwprobe dogru VRAM tier'i secsin,
+  # Kaynaklar sayfasi canli GPU metriklerini (kullanim/VRAM/sicaklik) gosterebilsin.
+  gateway:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
