@@ -276,7 +276,7 @@ def plan(
             if used + size > budget_total:
                 plan_obj.passive_models.append(mid)
                 plan_obj.warnings.append(
-                    f"'{mid}' butceye sigmiyor (gerekli {size:.1f} GB, kalan "
+                    f"'{mid}' bellek butcesine sigmiyor (gerekli {size:.1f} GB, kalan "
                     f"{max(0.0, budget_total - used):.1f} GB). Pasif isaretlendi."
                 )
                 continue
@@ -310,7 +310,7 @@ def plan(
         )
     plan_obj.notes.append(
         f"Profil: {profile_name} ({'otomatik' if profile_auto else 'manuel'}). "
-        f"Butce: {budget_total:.1f} GB / {total_gb:.1f} GB."
+        f"Bellek butcesi: {budget_total:.1f} GB / {total_gb:.1f} GB."
     )
 
     if not plan_obj.active_models:

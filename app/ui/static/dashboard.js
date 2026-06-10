@@ -43,7 +43,7 @@
       ["Profil", `${cap.profile_label || cap.profile || "?"}`],
       ["Donanim sinifi", (cap.hardware_tier || "?").toUpperCase()],
       ["Hizlandirici", (cap.accelerator || "?").toUpperCase()],
-      ["Butce kullanim", `${fmtNumber(cap.budget_used_gb, 2)} / ${fmtNumber(cap.budget_total_gb, 2)} GB`],
+      ["Bellek butcesi kullanimi", `${fmtNumber(cap.budget_used_gb, 2)} / ${fmtNumber(cap.budget_total_gb, 2)} GB`],
       ["Max yuklu model", cap.max_loaded_models || 1],
       ["Es zamanli istek", cap.max_concurrent_requests || 1],
       ["Beklenen kullanici", cap.expected_users || "—"],

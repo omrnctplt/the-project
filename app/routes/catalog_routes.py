@@ -40,9 +40,9 @@ async def get_catalog(request: Request, _=Depends(auth.current_principal)) -> di
 
 def _advice_for_verdict(fits_current: bool, fits_total: bool, accel: str) -> str:
     if fits_current:
-        return "Model mevcut butceye sigiyor — aktif olarak yuklenebilir."
+        return "Model, ayrilan bellek butcesine sigiyor — aktif olarak yuklenebilir."
     if fits_total:
-        return ("Mevcut profil butcesi dolu ama donanim toplaminda yer var. "
+        return ("Mevcut profilin bellek butcesi dolu ama donanim toplaminda yer var. "
                 "Daha buyuk bir profil (balanced/performance) secebilirsiniz.")
     return ("Model bu donanim icin cok buyuk. Daha kucuk bir varyant secin "
             f"(orn: 7B yerine 3B) veya {'GPU' if accel == 'cpu' else 'daha buyuk bir GPU'} gerekli.")

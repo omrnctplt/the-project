@@ -244,8 +244,8 @@
       : "";
     const fitsBadge = it.cloud ? ""
       : it.fits
-      ? '<span class="badge ok">butce uygun</span>'
-      : '<span class="badge warn">butce yetersiz</span>';
+      ? '<span class="badge ok">bellege sigar</span>'
+      : '<span class="badge warn">bellek yetersiz</span>';
     const sizeBadge = it.cloud
       ? '<span class="badge plain">boyut: bulut</span>'
       : `<span class="badge plain">${it.ram_gb || "?"} GB</span>`;
@@ -266,10 +266,10 @@
       actions = it.pulled
         ? `<span class="muted" style="font-size:0.78rem;">Sistemde kurulu</span>`
         : `
-        <button class="primary" data-action="add-pull" data-tag="${escapeHtml(it.ollama_tag)}" data-cat="${it.category}" data-gb="${it.ram_gb}" data-label="${escapeHtml(it.label)}" ${it.fits ? "" : "disabled title='Butceye sigmiyor'"}>+ Kur (ekle & pull)</button>
+        <button class="primary" data-action="add-pull" data-tag="${escapeHtml(it.ollama_tag)}" data-cat="${it.category}" data-gb="${it.ram_gb}" data-label="${escapeHtml(it.label)}" ${it.fits ? "" : "disabled title='Ayrilan bellege sigmiyor'"}>+ Kur (ekle & pull)</button>
       `;
     } else if (!it.pulled) {
-      actions = `<button class="primary" data-action="pull" data-mid="${escapeHtml(it.model_id)}" ${it.fits ? "" : "title='Butceye sigmiyor'"}>Pull et</button>`;
+      actions = `<button class="primary" data-action="pull" data-mid="${escapeHtml(it.model_id)}" ${it.fits ? "" : "title='Ayrilan bellege sigmiyor'"}>Pull et</button>`;
       if (it.overridden) {
         actions += `<button class="danger small" data-action="remove" data-mid="${escapeHtml(it.model_id)}">Katalogdan sil</button>`;
       }
@@ -288,7 +288,7 @@
     const pct = budgetTotal ? Math.min(100, (parseFloat(it.ram_gb || 0) / budgetTotal) * 100) : 0;
     const usageBar = budgetTotal ? `
       <div style="margin-top:0.45rem;">
-        <div class="muted" style="font-size:0.7rem; display:flex; justify-content:space-between;"><span>Butce payi</span><span>${pct.toFixed(0)}%</span></div>
+        <div class="muted" style="font-size:0.7rem; display:flex; justify-content:space-between;"><span>Bellek payi</span><span>${pct.toFixed(0)}%</span></div>
         <div class="cbar-track" style="margin-top:0.2rem;"><div class="cbar-fill" style="width:${pct}%; background:${it.fits ? "var(--accent)" : "var(--warn)"};"></div></div>
       </div>` : "";
     return `
@@ -459,7 +459,7 @@
         <label>RAM/VRAM (GB) <input id="cm_ram" type="number" step="0.1" min="0.1" placeholder="3.0" /></label>
         <div style="display:flex; gap:0.5rem;">
           <button id="cm_inspect" type="button">Boyutu tahmin et</button>
-          <button id="cm_dryrun" type="button">Butceye sigar mi?</button>
+          <button id="cm_dryrun" type="button">Bellege sigar mi?</button>
         </div>
       `,
       primary: "Ekle",
@@ -508,11 +508,11 @@
             <tr><td>${escapeHtml(n)}</td><td>${p.budget_total_gb} GB</td>
             <td>${p.fits ? '<span class="badge ok">sigar</span>' : '<span class="badge warn">sigmaz</span>'}</td></tr>`).join("");
           modal({
-            title: "Butce raporu",
+            title: "Bellek raporu",
             body: `
               <p style="margin-top:0;"><strong>${escapeHtml(r.verdict)}</strong></p>
               <p class="muted">${escapeHtml(r.advice)}</p>
-              <table class="kv"><tr><th>Profil</th><th>Butce</th><th>Durum</th></tr>${rows}</table>`,
+              <table class="kv"><tr><th>Profil</th><th>Ayrilan bellek</th><th>Durum</th></tr>${rows}</table>`,
             primary: "Tamam",
           });
         } catch (e) { toast("Dry-run: " + e.message, "error", 5000); }
