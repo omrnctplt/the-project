@@ -1,5 +1,6 @@
 .env
 data/
+data-dev/
 _legacy/
 __pycache__/
 *.pyc

@@ -105,12 +105,18 @@ def verify_password(username: str, password: str) -> bool:
     return _verify_password(password, user["password_hash"])
 
 
+def demo_mode_enabled() -> bool:
+    return os.getenv("DEMO_MODE", "true").strip().lower() == "true"
+
+
 def seed_default_users() -> None:
     admin_override = os.getenv("ADMIN_PASSWORD") or ""
     with _lock, _connect() as conn:
         _ensure_schema(conn)
         existing = {row["username"] for row in conn.execute("SELECT username FROM users")}
         defaults = load_default_users().get("users") or {}
+        if not demo_mode_enabled():
+            defaults = {k: v for k, v in defaults.items() if k == "admin"}
         now = datetime.now(timezone.utc).isoformat()
         for username, props in defaults.items():
             if username in existing:
@@ -207,5 +213,12 @@ def change_password(username: str, new_password: str) -> bool:
             "UPDATE users SET password_hash = ? WHERE username = ?",
             (_hash_password(new_password), username),
         )
+        conn.commit()
+        return cur.rowcount > 0
+
+
+def delete_user(username: str) -> bool:
+    with _lock, _connect() as conn:
+        cur = conn.execute("DELETE FROM users WHERE username = ?", (username,))
         conn.commit()
         return cur.rowcount > 0

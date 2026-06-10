@@ -253,16 +253,6 @@ def write_profile(profile: dict[str, Any], path: str | Path = HW_PROFILE_PATH) -
     return p
 
 
-def load_profile(path: str | Path = HW_PROFILE_PATH) -> dict[str, Any] | None:
-    p = Path(path)
-    if not p.exists():
-        return None
-    try:
-        return json.loads(p.read_text())
-    except (OSError, json.JSONDecodeError):
-        return None
-
-
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     result = probe()

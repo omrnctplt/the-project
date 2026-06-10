@@ -23,7 +23,7 @@ Kucuk ekipler icin Ollama'nin onunde duran bir yonlendirme katmani. Sistem ilk a
 
 ### UI (premium, sidebar layout)
 - **Onboarding sihirbazi:** Ilk acilista donanim ozeti + kategoriye gore filtrelenmis model kartlari (yesil cerceveli olanlar butceye sigar)
-- **ChatGPT-tarzi sohbet:** Sol konusma gecmisi, akan mesajlar, **markdown render** (kod blogu kopyala butonlu), **Durdur / yeniden uret / tok/s**, markdown disa aktar, departman bazli ornek prompt kartlari
+- **ChatGPT-tarzi sohbet:** **Cok turlu baglam** (onceki turlar modele gider), sol konusma gecmisi (kullanici-bazli, cikista silinir), akan mesajlar, **markdown render** (kod blogu kopyala butonlu), **Durdur / yeniden uret / tok/s**, markdown disa aktar, departman bazli ornek prompt kartlari
 - **Modeller sayfasi:** Arama + kategori/durum filtresi + accordion + model kartlari (pull / sil / hizli test)
 - **Sistem kaynaklari sayfasi (admin):** Host CPU/mem/disk progress bar, top processes, Docker container stats, otomatik aksiyon onerileri
 - **Yonetim:** Profil/kullanicilar/kullanim/denetim tab'lari + sifre degistirme modal
@@ -57,15 +57,17 @@ Kucuk ekipler icin Ollama'nin onunde duran bir yonlendirme katmani. Sistem ilk a
 - **Audit log:** SQLite, prompt **hash**'i ile saklanir (KVKK uyumlu — ham prompt tutulmaz)
 - **Usage tracking:** Kullanici × gun × model bazli token/istek/latency
 
-### Guvenlik
+### Guvenlik & KVKK
+Ayrintili veri envanteri ve uyum onlemleri icin: **[SECURITY.md](SECURITY.md)**
+- **KVKK uyumu:** aydinlatma metni (`/ui/privacy`), veri minimizasyonu (prompt'un yalnizca salt'li SHA-256 ozeti saklanir, IP toplanmaz), `RETENTION_DAYS` ile otomatik veri imha, silme hakki endpoint'leri (`DELETE /api/v1/users/{u}/data` ve `/api/v1/users/{u}`)
 - **JWT auth** (`HS256`, 8 saatlik TTL) — secret verilmezse otomatik uretilir ve kalici saklanir
-- **bcrypt** ile sifre hashleme
+- **bcrypt** ile sifre hashleme; yeni parolalar en az 8 karakter
 - **Login brute-force korumasi** — kullanici basina dakikada 10 deneme
-- **Rate limit** departman bazli (in-memory sliding window)
-- **Rol bazli erisim:** `admin` / `user`
-- **Sifre degistirme** endpoint'i + UI modal
-- **HTTP guvenlik basliklari:** CSP, `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy` (middleware; `/docs` Swagger CDN icin CSP disinda)
-- **Rate-limit** 429 yanitlarinda `Retry-After` header
+- **Rate limit** departman bazli (in-memory sliding window); 429 yanitlarinda `Retry-After`
+- **Rol bazli erisim:** `admin` / `user` — UI da rol farkindadir (yetkisiz butonlar gizlenir)
+- **DEMO_MODE=false** ile uretim modu: yalnizca admin seed edilir, demo parola listesi gizlenir
+- **Ollama portu 127.0.0.1'e kilitli** — gateway'in auth/audit katmani agdan atlanamaz
+- **HTTP guvenlik basliklari:** CSP, `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`
 
 ---
 
@@ -291,13 +293,15 @@ OpenAPI / Swagger: **http://localhost:8080/docs**
 | `GET  /api/v1/system/bootstrap` | Bootstrap stage stream (token gerekmez) |
 | `GET  /api/v1/onboarding/state` | Ilk acilis akisi durumu |
 
-### Denetim & kullanim
+### Denetim, kullanim & KVKK
 | | |
 |---|---|
 | `GET  /api/v1/usage/me` | Kullanicinin kullanim ozeti |
 | `GET  /api/v1/usage/global` | Tum kullanim (admin) |
 | `GET  /api/v1/audit?limit=100` | Audit log (admin) |
 | `GET  /api/v1/users` | Kullanici listesi (admin) |
+| `DELETE /api/v1/users/{u}/data` | KVKK silme hakki: islem kayitlarini sil (admin) |
+| `DELETE /api/v1/users/{u}` | Hesabi + tum kisisel veriyi sil (admin) |
 
 ### Saglik / metrik
 | | |
@@ -385,6 +389,10 @@ OLLAMA_KV_CACHE_TYPE=f16                # q8_0 icin OLLAMA_FLASH_ATTENTION=true 
 AUTO_PULL_MODELS=false                  # ONERILEN: false
 IDLE_UNLOAD_MINUTES=3
 
+# KVKK / uretim
+RETENTION_DAYS=180                      # audit/usage kayitlarinin otomatik imha suresi (0=kapali)
+DEMO_MODE=true                          # false: sadece admin seed edilir, demo listesi gizlenir
+
 # Canli kesif
 DISCOVERY_TTL_HOURS=24                  # uzak katalog cache suresi
 DISCOVERY_HF_LIMIT=40                   # HuggingFace'ten cekilecek repo sayisi
@@ -397,7 +405,16 @@ DISCOVERY_HF_LIMIT=40                   # HuggingFace'ten cekilecek repo sayisi
 ```
 .
 ├── app/                      # Python paketi
-│   ├── main.py               # FastAPI uygulamasi, 42 endpoint
+│   ├── main.py               # App kurulumu, middleware, saglik endpointleri
+│   ├── runtime.py            # Yasam dongusu: bootstrap, replan, KVKK retention
+│   ├── deps.py               # Paylasilan FastAPI dependency'leri
+│   ├── routes/               # Is mantigi — odaklanmis router modulleri
+│   │   ├── auth_routes.py    #   login + sifre degistirme
+│   │   ├── chat_routes.py    #   one-shot + streaming sohbet (cok turlu)
+│   │   ├── catalog_routes.py #   katalog, kesif (statik+canli), pull/sil
+│   │   ├── system_routes.py  #   profil, kapasite, config, kaynaklar
+│   │   ├── users_routes.py   #   kullanim, denetim, KVKK veri haklari
+│   │   └── ui_routes.py      #   Jinja2 sayfalari
 │   ├── auth.py               # JWT + bcrypt + SQLite (secret otomatik uretimi)
 │   ├── capacity.py           # Profil bazli kapasite planlayicisi
 │   ├── orchestrator.py       # Model lifecycle (lazy pull, idle unload)
@@ -406,14 +423,14 @@ DISCOVERY_HF_LIMIT=40                   # HuggingFace'ten cekilecek repo sayisi
 │   ├── router.py             # Routing + prompt-aware size
 │   ├── hwprobe.py            # Donanim tespiti (CPU/RAM/GPU/disk)
 │   ├── sysmonitor.py         # psutil + docker stats
-│   ├── audit.py / usage.py   # SQLite + indexler
+│   ├── audit.py / usage.py   # SQLite + indexler + KVKK purge/silme
 │   ├── config.py / models.py # YAML/runtime + Pydantic semalar
 │   ├── metrics.py            # Prometheus metrik tanimlari
 │   ├── state.py              # AppState + BootstrapTracker
 │   ├── ui/
 │   │   ├── templates/        # base, login, dashboard, chat, models,
-│   │   │                     # onboarding, resources, admin
-│   │   └── static/           # style.css + 7 JS dosyasi
+│   │   │                     # onboarding, resources, admin, privacy
+│   │   └── static/           # style.css + 8 JS dosyasi
 │   └── Dockerfile + requirements.txt
 ├── config/
 │   ├── model_catalog.yaml    # Model + departman + routing kurallari
@@ -426,7 +443,7 @@ DISCOVERY_HF_LIMIT=40                   # HuggingFace'ten cekilecek repo sayisi
 │   ├── preflight.sh          # Linux/Mac
 │   └── preflight.ps1         # Windows PowerShell
 ├── simulator/                # Yuk uretici container
-├── tests/                    # pytest (capacity, router, auth, usage, config, audit, orchestrator, ollama_client, discovery, integration — 87 test)
+├── tests/                    # pytest (capacity, router, auth, usage, config, audit, orchestrator, ollama_client, discovery, kvkk, integration — 100 test)
 ├── data/                     # Runtime: users.db + audit.db + usage.db
 │                             # + runtime_config.yaml + catalog_overrides.yaml
 ├── docker-compose.yml
@@ -467,7 +484,7 @@ pytest -q tests/
 docker compose up -d --build gateway
 ```
 
-Tum testler gecmeli — **87 test** (`pytest -q tests/`).
+Tum testler gecmeli — **100 test** (`pytest -q tests/`).
 
 ---
 

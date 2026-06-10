@@ -25,10 +25,16 @@ class TokenResponse(_Base):
     expires_in: int
 
 
+class ChatTurn(_Base):
+    role: str = Field(..., pattern="^(user|assistant)$")
+    content: str = Field(..., min_length=1, max_length=8192)
+
+
 class ChatRequest(_Base):
     prompt: str = Field(..., min_length=1, max_length=8192)
     temperature: float | None = Field(default=None, ge=0.0, le=2.0)
     model_id: str | None = None     # admin override; siradan kullanici icin yok sayilir
+    history: list[ChatTurn] | None = Field(default=None, max_length=20)
 
 
 class ChatResponse(_Base):
@@ -45,13 +51,11 @@ class ChatResponse(_Base):
 
 class PasswordChangeRequest(_Base):
     current_password: str = Field(..., min_length=1, max_length=256)
-    new_password: str = Field(..., min_length=6, max_length=256)
+    new_password: str = Field(..., min_length=8, max_length=256)
 
 
-class ChatStreamRequest(_Base):
-    prompt: str = Field(..., min_length=1, max_length=8192)
-    temperature: float | None = Field(default=None, ge=0.0, le=2.0)
-    model_id: str | None = None
+class ChatStreamRequest(ChatRequest):
+    pass
 
 
 class CatalogModelRequest(_Base):

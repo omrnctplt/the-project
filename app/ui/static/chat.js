@@ -2,8 +2,11 @@
   const user = window.currentUser || {};
   const isAdmin = user.role === "admin";
 
-  /* ---------- Conversation store (localStorage) ---------- */
-  const STORAGE = "hub_convs_v1";
+  /* ---------- Conversation store (localStorage, kullanici bazli) ----------
+     Anahtar kullanici adina baglidir: ayni tarayicida farkli hesaplarin
+     sohbetleri birbirine karismaz. Eski paylasimli anahtar temizlenir. */
+  const STORAGE = "hub_convs_v1:" + (user.username || "anon");
+  localStorage.removeItem("hub_convs_v1");
   function loadConvs() {
     try { return JSON.parse(localStorage.getItem(STORAGE) || "[]"); } catch { return []; }
   }
@@ -66,10 +69,16 @@
       li.innerHTML = `
         <span class="title">${escapeHtml(c.title || "Sohbet")}</span>
         <button class="del" data-del="${c.id}" title="Sil" aria-label="Sohbeti sil">✕</button>`;
-      li.onclick = (e) => {
+      li.onclick = async (e) => {
         if (e.target.dataset.del) {
-          if (!confirm("Bu sohbet silinsin mi?")) return;
-          deleteConv(e.target.dataset.del);
+          const id = e.target.dataset.del;
+          const ok = await confirmModal({
+            title: "Sohbeti sil",
+            body: "Bu sohbet kalici olarak silinecek. Emin misiniz?",
+            primary: "Sil",
+          });
+          if (!ok) return;
+          deleteConv(id);
           renderAll();
           return;
         }
@@ -235,6 +244,13 @@
 
     if (!getActive()) newConv();
     const conv = getActive();
+    const targetConvId = conv.id;
+
+    // Cok turlu baglam: bu sohbetin onceki turlari (yeni eklenen haric)
+    const history = conv.messages
+      .filter(m => m.content && !m.streaming)
+      .slice(-8)
+      .map(m => ({ role: m.role, content: String(m.content).slice(0, 8000) }));
 
     if (!skipUserPush) {
       conv.messages.push({ role: "user", content: prompt, ts: Date.now() });
@@ -252,6 +268,7 @@
     const useStream = streamToggle.checked;
     const adminPick = isAdmin ? adminPicker.value : "";
     const body_ = { prompt };
+    if (history.length) body_.history = history;
     if (adminPick) body_.model_id = adminPick;
     const temp = tempSelect && tempSelect.value ? parseFloat(tempSelect.value) : null;
     if (temp != null && !isNaN(temp)) body_.temperature = temp;
@@ -260,9 +277,9 @@
     let aborted = false;
     try {
       if (useStream) {
-        await runStream(asst, body_, abortCtl.signal);
+        await runStream(asst, body_, abortCtl.signal, targetConvId);
       } else {
-        await runOneShot(asst, body_, abortCtl.signal);
+        await runOneShot(asst, body_, abortCtl.signal, targetConvId);
       }
     } catch (err) {
       if (err.name === "AbortError") {
@@ -285,7 +302,7 @@
     return !aborted;
   }
 
-  async function runOneShot(asst, body_, signal) {
+  async function runOneShot(asst, body_, signal, targetConvId) {
     const token = localStorage.getItem("token");
     const resp = await fetch("/api/v1/chat", {
       method: "POST",
@@ -305,10 +322,10 @@
       matched_rule: r.matched_rule, fallback_triggered: r.fallback_triggered,
       latency_ms: r.latency_ms, eval_count: r.eval_count,
     };
-    renderBody();
+    if (activeId === targetConvId) renderBody();
   }
 
-  async function runStream(asst, body_, signal) {
+  async function runStream(asst, body_, signal, targetConvId) {
     const t0 = performance.now();
     const token = localStorage.getItem("token");
     const resp = await fetch("/api/v1/chat/stream", {
@@ -344,12 +361,12 @@
             matched_rule: evt.matched_rule,
             fallback_triggered: evt.fallback_triggered,
           };
-          renderBody();
+          if (activeId === targetConvId) renderBody();
         } else if (evt.event === "token") {
           if (evt.response) {
             asst.content += evt.response;
             const now = performance.now();
-            if (now - lastRender > 60) { updateLastContent(asst.content); lastRender = now; }
+            if (now - lastRender > 60) { updateLastContent(asst.content, targetConvId); lastRender = now; }
           }
           if (evt.done) evalCount = evt.eval_count || 0;
         } else if (evt.event === "error") {
@@ -357,7 +374,7 @@
         }
       }
     }
-    updateLastContent(asst.content);
+    updateLastContent(asst.content, targetConvId);
     const dt = performance.now() - t0;
     if (asst.meta) {
       asst.meta.latency_ms = dt;
@@ -365,12 +382,15 @@
     }
   }
 
-  function updateLastContent(text) {
+  function updateLastContent(text, targetConvId) {
+    // Kullanici baska sohbete gectiyse DOM'a yazma — store guncel kalir
+    if (targetConvId && activeId !== targetConvId) return;
     const msgs = body.querySelectorAll(".msg.assistant .content");
     if (!msgs.length) return;
     const last = msgs[msgs.length - 1];
+    const nearBottom = body.scrollHeight - body.scrollTop - body.clientHeight < 90;
     last.innerHTML = renderMarkdown(text);
-    body.scrollTop = body.scrollHeight;
+    if (nearBottom) body.scrollTop = body.scrollHeight;
   }
 
   /* ---------- Mesaj aksiyonlari (kopyala / yeniden uret) ---------- */

@@ -13,7 +13,6 @@
 defaults:
   context_window: 4096
   temperature: 0.6
-  warmup_on_start: false
 
 categories:
   text:

@@ -1494,3 +1494,18 @@ textarea:focus-visible { outline: none; }
     scroll-behavior: auto !important;
   }
 }
+
+/* ---------- Dokunmatik + mobil saglamlik duzeltmeleri ---------- */
+@media (pointer: coarse) {
+  .chat-sidebar .conv .del,
+  .msg-actions { opacity: 1; }
+}
+@media (max-width: 900px) {
+  .card { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .chat-main { min-height: 0; }
+}
+@supports (height: 100dvh) {
+  @media (max-width: 900px) {
+    .app-shell { min-height: 100dvh; }
+  }
+}

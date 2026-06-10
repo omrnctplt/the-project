@@ -1,4 +1,5 @@
 (async function () {
+  const isAdmin = (window.currentUser || {}).role === "admin";
   let catalog = {};        // model_id -> def
   let states = [];         // orchestrator states
   let discover = [];       // populer modeller
@@ -21,6 +22,11 @@
   const remoteMetaEl = document.getElementById("remoteMeta");
 
   async function refresh() {
+    if (!acc.children.length) {
+      acc.innerHTML = `<div class="model-grid">${Array.from({ length: 6 }, () =>
+        `<div class="model-card"><div class="skeleton" style="height:1rem; width:60%; margin-bottom:0.5rem;"></div><div class="skeleton" style="height:0.8rem; width:90%;"></div><div class="skeleton" style="height:0.8rem; width:40%; margin-top:0.5rem;"></div></div>`
+      ).join("")}</div>`;
+    }
     try {
       const profile = await api("/api/v1/system/profile");
       capacity = profile.capacity || {};
@@ -245,7 +251,11 @@
       ? `<span class="badge plain">${typeof fmtNumber === "function" ? fmtNumber(it.popularity) : it.popularity} indirme</span>` : "";
 
     let actions = "";
-    if (it.source === "discover") {
+    if (!isAdmin) {
+      actions = it.pulled
+        ? `<span class="muted" style="font-size:0.78rem;">Sistemde kurulu — sohbette kullanilabilir</span>`
+        : `<span class="muted" style="font-size:0.78rem;">Kurulum icin yoneticinize basvurun</span>`;
+    } else if (it.source === "discover") {
       actions = it.pulled
         ? `<span class="muted" style="font-size:0.78rem;">Sistemde kurulu</span>`
         : `
@@ -301,7 +311,17 @@
 
   function bindAccordion() {
     acc.querySelectorAll(".accordion-section .head").forEach(h => {
-      h.onclick = () => h.parentElement.classList.toggle("open");
+      const toggle = () => {
+        const open = h.parentElement.classList.toggle("open");
+        h.setAttribute("aria-expanded", String(open));
+      };
+      h.setAttribute("tabindex", "0");
+      h.setAttribute("role", "button");
+      h.setAttribute("aria-expanded", String(h.parentElement.classList.contains("open")));
+      h.onclick = toggle;
+      h.onkeydown = (e) => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); }
+      };
     });
   }
 
@@ -338,9 +358,12 @@
         await api(`/api/v1/system/pull/${encodeURIComponent(mid)}`, { method: "POST" });
         toast("Kurulum baslatildi: katalog + indirme", "ok");
       } else if (act === "remove") {
-        if (!confirm(`'${btn.dataset.mid}' override silinsin mi?`)) {
-          btn.disabled = false; btn.textContent = orig; return;
-        }
+        const ok = await confirmModal({
+          title: "Katalogdan sil",
+          body: `<code>${escapeHtml(btn.dataset.mid)}</code> katalog kaydi silinecek. Devam edilsin mi?`,
+          primary: "Sil",
+        });
+        if (!ok) { btn.disabled = false; btn.textContent = orig; return; }
         await api(`/api/v1/system/catalog/models/${encodeURIComponent(btn.dataset.mid)}`, { method: "DELETE" });
         toast("Silindi", "ok");
       } else if (act === "test") {
@@ -350,9 +373,12 @@
         });
         toast(`Test OK · ${Math.round(r.latency_ms)} ms · ${r.eval_count} tok`, "ok", 4500);
       } else if (act === "delete-pulled") {
-        if (!confirm(`'${btn.dataset.mid}' modeli Ollama'dan silinsin mi? Disk bosalir, gerektiginde tekrar pull edebilirsiniz.`)) {
-          btn.disabled = false; btn.textContent = orig; return;
-        }
+        const ok = await confirmModal({
+          title: "Modeli diskten sil",
+          body: `<code>${escapeHtml(btn.dataset.mid)}</code> Ollama'dan silinecek; disk bosalir, gerektiginde tekrar indirilebilir.`,
+          primary: "Sil",
+        });
+        if (!ok) { btn.disabled = false; btn.textContent = orig; return; }
         await api(`/api/v1/system/models/${encodeURIComponent(btn.dataset.mid)}/pulled`, { method: "DELETE" });
         toast("Model Ollama'dan silindi", "ok");
       }
@@ -361,10 +387,6 @@
       toast("Hata: " + err.message, "error", 5000);
       btn.disabled = false; btn.textContent = orig;
     }
-  }
-
-  function tagToModelId(tag) {
-    return tag.replace(/[:.\/]/g, "-").replace(/[^a-zA-Z0-9._\-]/g, "").slice(0, 64);
   }
 
   // Search / filter
@@ -438,7 +460,7 @@
         const tag = document.getElementById("cm_tag").value.trim();
         const cat = document.getElementById("cm_cat").value;
         const ram = parseFloat(document.getElementById("cm_ram").value);
-        if (!tag || isNaN(ram)) { toast("Tag ve RAM zorunlu", "warn"); return; }
+        if (!tag || isNaN(ram)) { toast("Tag ve RAM zorunlu", "warn"); return false; }
         const mid = tagToModelId(tag);
         try {
           await api("/api/v1/system/catalog/models", {
@@ -447,7 +469,10 @@
           });
           toast("Eklendi", "ok");
           refresh();
-        } catch (e) { toast("Eklenemedi: " + e.message, "error", 5000); }
+        } catch (e) {
+          toast("Eklenemedi: " + e.message, "error", 5000);
+          return false;
+        }
       },
     });
     // Bind dynamic buttons inside modal
@@ -472,10 +497,17 @@
             method: "POST",
             body: JSON.stringify({ model_id: mid, ollama_tag: tag, category: cat, ram_gb: ram, vram_gb: ram }),
           });
-          alert(`${r.verdict}\n\n${r.advice}\n\nProfiller:\n` +
-            Object.entries(r.profiles).map(([n, p]) =>
-              `  ${n}: butce ${p.budget_total_gb} GB, sigar: ${p.fits ? "evet" : "hayir"}`
-            ).join("\n"));
+          const rows = Object.entries(r.profiles).map(([n, p]) => `
+            <tr><td>${escapeHtml(n)}</td><td>${p.budget_total_gb} GB</td>
+            <td>${p.fits ? '<span class="badge ok">sigar</span>' : '<span class="badge warn">sigmaz</span>'}</td></tr>`).join("");
+          modal({
+            title: "Butce raporu",
+            body: `
+              <p style="margin-top:0;"><strong>${escapeHtml(r.verdict)}</strong></p>
+              <p class="muted">${escapeHtml(r.advice)}</p>
+              <table class="kv"><tr><th>Profil</th><th>Butce</th><th>Durum</th></tr>${rows}</table>`,
+            primary: "Tamam",
+          });
         } catch (e) { toast("Dry-run: " + e.message, "error", 5000); }
       });
     }, 50);

@@ -1,4 +1,5 @@
 (async function () {
+  const isAdmin = (window.currentUser || {}).role === "admin";
   // HW + budget
   let profile = null;
   try {
@@ -39,6 +40,18 @@
     recHint.textContent = `Donanim sinifiniz: ${(cap.hardware_tier || "?").toUpperCase()} · ${(accel || "?").toUpperCase()}`;
   }
 
+  if (!isAdmin) {
+    const notice = document.createElement("div");
+    notice.className = "card";
+    notice.style.cssText = "margin:0.75rem 0 1rem; border-left:3px solid var(--warn);";
+    notice.innerHTML = `
+      <strong>Sistemde henuz kurulu model yok.</strong>
+      <p class="muted" style="margin:0.4rem 0 0.6rem;">Model kurulumu yonetici yetkisi gerektirir.
+      Asagidaki liste donaniminiza uygun modelleri gosterir; kurulum icin yoneticinize iletebilirsiniz.</p>
+      <a href="/ui/dashboard" class="nav-item" style="display:inline-block;">Panele don →</a>`;
+    list.parentElement.insertBefore(notice, list);
+  }
+
   function render() {
     list.innerHTML = "";
     // Backend zaten onerilenleri basa koydu; kategori filtresi uygula
@@ -69,10 +82,14 @@
           ${recBadge}
         </div>
         <div class="actions">
-          <button class="primary" data-tag="${escapeHtml(m.tag)}" data-cat="${m.category}" data-gb="${m.approx_gb}" data-label="${escapeHtml(m.label)}" ${fits ? "" : "disabled"}>
+          ${isAdmin ? `
+          <button class="primary" data-tag="${escapeHtml(m.tag)}" data-mid="${escapeHtml(m.model_id || "")}" data-cat="${m.category}" data-gb="${m.approx_gb}" data-label="${escapeHtml(m.label)}" ${fits ? "" : "disabled"}>
             ${m.pulled ? "Indirilmis ✓" : "Ekle ve pull et"}
           </button>
           <button data-skip="1" class="ghost">Atlat</button>
+          ` : `
+          <span class="muted" style="font-size:0.78rem;">${m.pulled ? "Kurulu ✓" : "Kurulum yonetici yetkisi gerektirir"}</span>
+          `}
         </div>`;
       list.appendChild(card);
     }
@@ -101,9 +118,9 @@
     const original = btn.textContent;
     btn.textContent = "Ekleniyor...";
     try {
-      // Generate ID from tag
       const tag = btn.dataset.tag;
-      const modelId = tag.replace(/[:.]/g, "-").replace(/[^a-zA-Z0-9._\-]/g, "");
+      // Katalogdaki gercek id'yi kullan; yoksa ortak kuralla turet (mukerrer kayit onlenir)
+      const modelId = btn.dataset.mid || tagToModelId(tag);
       const category = btn.dataset.cat;
       const ram = parseFloat(btn.dataset.gb);
       // Try add to catalog (idempotent — if exists, just pull)

@@ -68,9 +68,6 @@ class BootstrapTracker:
             step.detail = detail
         step.finished_at = time.time()
 
-    def all_done(self) -> bool:
-        return all(s.status in ("ok", "warn", "skipped", "error") for s in self.steps)
-
     def overall_status(self) -> str:
         if any(s.status == "error" for s in self.steps):
             return "error"

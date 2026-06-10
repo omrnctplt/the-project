@@ -110,8 +110,9 @@ class Router:
 
         # Once hazir olanlar (ready/loaded)
         candidates = [s for s in states if _match(s) and s["status"] in ("ready", "loaded")]
-        if not candidates:
-            # Pulling/unknown olanlar — hala bekleyebilir
+        if not candidates and getattr(self.orchestrator, "auto_pull", False):
+            # Lazy pull aciksa henuz inmemis aktif modeller de aday olur;
+            # kapaliyken bunlara yonlendirmek garantili 502 demek — fallback'a birak.
             candidates = [s for s in states if _match(s) and s["status"] in ("pulling", "unknown")]
         if not candidates:
             return None

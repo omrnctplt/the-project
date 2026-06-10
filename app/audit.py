@@ -1,8 +1,14 @@
-"""Audit log — kim, ne zaman, hangi modele istek atti."""
+"""Audit log — kim, ne zaman, hangi modele istek atti.
+
+Veri minimizasyonu: prompt icerigi saklanmaz; kurulum-bazli salt ile
+SHA-256 ozeti tutulur. Salt sayesinde 'bilinen metni hash'leyip eslestirme'
+saldirisi baska kurulumlarda calismaz.
+"""
 
 from __future__ import annotations
 
 import hashlib
+import secrets
 import sqlite3
 from datetime import datetime, timezone
 from typing import Any
@@ -10,6 +16,8 @@ from typing import Any
 from .config import DATA_DIR
 
 DB_PATH = DATA_DIR / "audit.db"
+SALT_PATH = DATA_DIR / "audit_salt"
+_salt: str | None = None
 
 
 def _connect() -> sqlite3.Connection:
@@ -49,8 +57,28 @@ def ensure_schema() -> None:
         conn.commit()
 
 
+def _get_salt() -> str:
+    global _salt
+    if _salt:
+        return _salt
+    try:
+        existing = SALT_PATH.read_text(encoding="utf-8").strip()
+        if existing:
+            _salt = existing
+            return _salt
+    except OSError:
+        pass
+    _salt = secrets.token_hex(16)
+    try:
+        SALT_PATH.parent.mkdir(parents=True, exist_ok=True)
+        SALT_PATH.write_text(_salt, encoding="utf-8")
+    except OSError:
+        pass
+    return _salt
+
+
 def _hash_prompt(prompt: str) -> str:
-    return hashlib.sha256(prompt.encode("utf-8")).hexdigest()[:16]
+    return hashlib.sha256((_get_salt() + prompt).encode("utf-8")).hexdigest()[:16]
 
 
 def write(
@@ -95,6 +123,27 @@ def write(
             ),
         )
         conn.commit()
+
+
+def purge_older_than(days: int) -> int:
+    """KVKK saklama suresi: verilen gunden eski kayitlari siler, sayisini doner."""
+    if days <= 0:
+        return 0
+    with _connect() as conn:
+        cur = conn.execute(
+            "DELETE FROM audit_log WHERE timestamp < datetime('now', ?)",
+            (f"-{int(days)} day",),
+        )
+        conn.commit()
+        return cur.rowcount
+
+
+def delete_user_data(username: str) -> int:
+    """KVKK silme hakki: kullanicinin tum audit kayitlarini siler."""
+    with _connect() as conn:
+        cur = conn.execute("DELETE FROM audit_log WHERE username = ?", (username,))
+        conn.commit()
+        return cur.rowcount
 
 
 def query(

@@ -16,11 +16,15 @@ services:
       OLLAMA_HOST: http://ollama:11434
       JWT_SECRET: ${JWT_SECRET:-}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}
+      DEMO_MODE: ${DEMO_MODE:-true}
       DATA_DIR: /data
       CONFIG_DIR: /etc/onprem-ai
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       AUTO_PULL_MODELS: ${AUTO_PULL_MODELS:-false}
       IDLE_UNLOAD_MINUTES: ${IDLE_UNLOAD_MINUTES:-3}
+      RETENTION_DAYS: ${RETENTION_DAYS:-180}
+      DISCOVERY_TTL_HOURS: ${DISCOVERY_TTL_HOURS:-24}
+      DISCOVERY_HF_LIMIT: ${DISCOVERY_HF_LIMIT:-40}
       CAPACITY_PROFILE: ${CAPACITY_PROFILE:-auto}
       HOST_RAM_GB: ${HOST_RAM_GB:-}
       OLLAMA_NUM_PARALLEL: ${OLLAMA_NUM_PARALLEL:-}
@@ -63,7 +67,9 @@ services:
     volumes:
       - ollama_models:/root/.ollama
     ports:
-      - "${OLLAMA_PORT:-11434}:11434"
+      # 127.0.0.1 bind: agdaki digerleri gateway'in auth/audit katmanini
+      # atlayip dogrudan Ollama'ya erisemesin (KVKK m.12 veri guvenligi).
+      - "127.0.0.1:${OLLAMA_PORT:-11434}:11434"
     healthcheck:
       test: ["CMD-SHELL", "ollama list >/dev/null 2>&1 || exit 1"]
       interval: 10s

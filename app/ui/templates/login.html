@@ -21,8 +21,14 @@
         <input type="password" id="password" autocomplete="current-password" required />
       </label>
       <button type="submit" class="primary" style="width:100%; justify-content:center; margin-top:0.5rem;">Giris yap</button>
-      <p id="loginError" class="error hidden"></p>
+      <p id="loginError" class="error hidden" role="alert" aria-live="assertive"></p>
     </form>
+    <p class="muted" style="font-size:0.75rem; margin-top:0.9rem;">
+      Giris yaparak kisisel verilerinizin
+      <a href="/ui/privacy" style="color:var(--accent);">KVKK Aydinlatma Metni</a>'nde
+      aciklandigi sekilde islenmesini kabul etmis olursunuz.
+    </p>
+    {% if demo_mode %}
     <details style="margin-top:1.25rem;">
       <summary class="muted" style="cursor:pointer;">Demo hesaplari</summary>
       <table class="kv" style="margin-top:0.5rem;">
@@ -35,6 +41,7 @@
         <tr><td>guest</td>          <td><code>guest</code> · genel</td></tr>
       </table>
     </details>
+    {% endif %}
   </div>
 </div>
 {% endblock %}
@@ -67,7 +74,8 @@
       try {
         const headers = { "Authorization": `Bearer ${data.access_token}` };
         const ob = await fetch("/api/v1/onboarding/state", { headers }).then(r => r.json());
-        location.href = ob.needs_onboarding ? "/ui/onboarding" : "/ui/dashboard";
+        // Kurulum yetkisi olmayanlar onboarding'e degil panele gider
+        location.href = (ob.needs_onboarding && data.role === "admin") ? "/ui/onboarding" : "/ui/dashboard";
       } catch {
         location.href = "/ui/dashboard";
       }

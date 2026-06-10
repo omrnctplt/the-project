@@ -2,6 +2,39 @@
 
 Tum dikkat ceken degisiklikler bu dosyada listelenir. Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardina yakindir.
 
+## [0.7.0] - 2026-06-10
+
+KVKK uyum paketi + UX olgunlasmasi + mimari sadelestiriilme (anahtar teslim surumu).
+
+### Added — KVKK / guvenlik
+- **Aydinlatma metni sayfasi** (`/ui/privacy`, KVKK m.10) — login ekranindan ve kenar cubugundan erisilir; giris formu acik atif icerir
+- **Veri saklama suresi** — `RETENTION_DAYS` (varsayilan 180 gun): gunluk arka plan gorevi suresi dolan audit/usage kayitlarini otomatik siler
+- **Silme hakki (m.7/m.11)** — `DELETE /api/v1/users/{u}/data` (islem kayitlarini sil) ve `DELETE /api/v1/users/{u}` (hesabi tamamen sil); her ikisi denetim kaydina islenir
+- **DEMO_MODE** — `false` yapildiginda yalnizca admin seed edilir ve login ekranindaki demo parola listesi gizlenir (uretim modu)
+- **Ollama portu kilitlendi** — `127.0.0.1` bind: agdaki istemciler gateway'in auth/audit katmanini atlayamaz
+- **Audit hash'ine kurulum-bazli salt** — bilinen-metin eslestirme saldirisina karsi
+- **Parola politikasi** — yeni parolalar en az 8 karakter
+- **SECURITY.md** — veri envanteri, KVKK onlemleri, uretim sikilastirma rehberi
+
+### Added — UX
+- **Cok turlu sohbet** — onceki turlar artik modele baglam olarak gidiyor (`history` alani, karakter butceli); sohbet gercekten "konusma" oldu
+- **Sohbet gizliligi** — konusmalar kullanici-bazli anahtarda saklanir, cikista tamamen silinir (ortak bilgisayar guvenligi)
+- **Rol-farkindalikli UI** — admin olmayanlar icin kurulum/silme butonlari gizlenir (403 suprizi yok), /ui/admin ve /ui/resources panele yonlendirir, onboarding bilgilendirme ekranina doner
+- **Modal sistemi yenilendi** — dogrulama hatasinda acik kalir (veri kaybolmaz), Escape/focus-trap/aria-modal destegi; tum native confirm/alert'ler tema uyumlu modala tasindi
+- **Akilli kaydirma** — stream sirasinda kullanici yukari kaydirdiysa zorla dibe cekilmez
+- **Akis sirasinda sohbet degistirme korumasi** — token'lar yanlis sohbetin uzerine yazilmaz
+- **Dokunmatik erisim** — hover-gizli butonlar (sohbet sil, kopyala) dokunmatik cihazda gorunur
+- **Kaynaklar sayfasi dayanikliligi** — baglanti kopunca tek banner + 20 sn'ye yavaslayan yeniden deneme (toast yagmuru yok)
+- **Skeleton yukleme** — modeller sayfasi ilk acilista iskelet kartlar gosterir
+- **Klavye erisilebilirligi** — akordeon basliklari Tab/Enter/Space ile kullanilabilir (aria-expanded)
+- **Onboarding mukerrer kayit bug'i** — model_id artik katalogdaki gercek id'den alinir (ayni model iki farkli id ile eklenemez)
+
+### Changed — mimari
+- **main.py monoliti bolundu** (1130 satir → ~150): is mantigi `app/routes/` altinda 6 odakli modul (auth, chat, catalog, system, users, ui); yasam dongusu `app/runtime.py`; paylasilan dependency `app/deps.py` — `app.main:app` giris noktasi degismedi
+- **Chat kod tekrari kaldirildi** — `/chat` ile `/chat/stream` arasindaki ~55 satirlik kopya (rate-limit + routing karari) tek `_decide`/`_enforce_ready_and_rate` yardimcisina indi
+- **Olu kod temizligi** — `warmup_all`, `hwprobe.load_profile`, `BootstrapTracker.all_done`, okunmayan `warmup_on_start` anahtari; `ChatStreamRequest` artik `ChatRequest`'ten kalitim alir
+- 13 yeni KVKK testi (87 → 100)
+
 ## [0.6.0] - 2026-06-10
 
 Sifir konfigurasyonla tek komut + canli model kesfi.

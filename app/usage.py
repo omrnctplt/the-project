@@ -144,6 +144,27 @@ def global_summary(days: int = 30) -> dict[str, Any]:
     }
 
 
+def purge_older_than(days: int) -> int:
+    """KVKK saklama suresi: verilen gunden eski kullanim kayitlarini siler."""
+    if days <= 0:
+        return 0
+    with _connect() as conn:
+        cur = conn.execute(
+            "DELETE FROM user_usage WHERE day < date('now', ?)",
+            (f"-{int(days)} day",),
+        )
+        conn.commit()
+        return cur.rowcount
+
+
+def delete_user_data(username: str) -> int:
+    """KVKK silme hakki: kullanicinin tum kullanim kayitlarini siler."""
+    with _connect() as conn:
+        cur = conn.execute("DELETE FROM user_usage WHERE username = ?", (username,))
+        conn.commit()
+        return cur.rowcount
+
+
 def check_and_record_rate(
     key: str,
     limit_per_min: int,

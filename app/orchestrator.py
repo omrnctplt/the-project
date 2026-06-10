@@ -222,16 +222,6 @@ class Orchestrator:
         actives.sort(key=size_of)
         return actives[0].model_id
 
-    async def warmup_all(self) -> None:
-        for state in self._states.values():
-            if state.status != "ready":
-                continue
-            try:
-                await self.client.warmup(state.ollama_tag)
-                state.status = "loaded"
-            except Exception as exc:
-                log.warning("Warmup basarisiz [%s]: %s", state.model_id, exc)
-
     async def call(
         self,
         model_id: str,

@@ -33,7 +33,7 @@ jobs:
 
       - name: Import check (modules)
         run: |
-          python -c "from app import main, capacity, orchestrator, hwprobe, config, models, router, state, metrics, audit, usage, auth, sysmonitor, discovery; print('all imports OK')"
+          python -c "from app import main, capacity, orchestrator, hwprobe, config, models, router, state, metrics, audit, usage, auth, sysmonitor, discovery, runtime, deps; from app.routes import auth_routes, chat_routes, catalog_routes, system_routes, users_routes, ui_routes; print('all imports OK')"
         env:
           JWT_SECRET: ci-only-secret-do-not-use-in-prod
 
