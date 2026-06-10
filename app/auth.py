@@ -110,20 +110,36 @@ def demo_mode_enabled() -> bool:
 
 
 def seed_default_users() -> None:
+    """Demo kullanicilari hazirlar.
+
+    DEMO_MODE=true  : eksik kullanicilar eklenir VE mevcut demo kullanicilarin
+                      parolalari tabloya esitlenir — login ekraninda listelenen
+                      parolalar her acilista garantili calisir.
+    DEMO_MODE=false : yalnizca admin (yoksa) olusturulur; mevcut hesaplara
+                      asla dokunulmaz (uretim modu).
+    """
     admin_override = os.getenv("ADMIN_PASSWORD") or ""
+    demo = demo_mode_enabled()
     with _lock, _connect() as conn:
         _ensure_schema(conn)
         existing = {row["username"] for row in conn.execute("SELECT username FROM users")}
         defaults = load_default_users().get("users") or {}
-        if not demo_mode_enabled():
+        if not demo:
             defaults = {k: v for k, v in defaults.items() if k == "admin"}
         now = datetime.now(timezone.utc).isoformat()
+        resync = 0
         for username, props in defaults.items():
-            if username in existing:
-                continue
             password = str(props.get("password", "")) or "changeme"
             if username == "admin" and admin_override:
                 password = admin_override
+            if username in existing:
+                if demo and not verify_password(username, password):
+                    conn.execute(
+                        "UPDATE users SET password_hash = ? WHERE username = ?",
+                        (_hash_password(password), username),
+                    )
+                    resync += 1
+                continue
             department = str(props.get("department", "general"))
             role = str(props.get("role", "user"))
             label = props.get("label")
@@ -134,6 +150,8 @@ def seed_default_users() -> None:
             )
             log.info("Demo kullanici eklendi: %s (%s)", username, department)
         conn.commit()
+        if resync:
+            log.info("Demo mod: %d kullanicinin parolasi tablodaki degere esitlendi", resync)
 
 
 def get_user(username: str) -> dict[str, Any] | None:

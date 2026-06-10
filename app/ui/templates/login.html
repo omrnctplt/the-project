@@ -29,16 +29,16 @@
       aciklandigi sekilde islenmesini kabul etmis olursunuz.
     </p>
     {% if demo_mode %}
-    <details style="margin-top:1.25rem;">
-      <summary class="muted" style="cursor:pointer;">Demo hesaplari</summary>
-      <table class="kv" style="margin-top:0.5rem;">
-        <tr><td>admin</td>          <td><code>admin</code> · yonetici</td></tr>
-        <tr><td>dev_user</td>       <td><code>dev123</code> · muhendislik</td></tr>
-        <tr><td>hr_user</td>        <td><code>hr123</code> · IK</td></tr>
-        <tr><td>finance_user</td>   <td><code>fin123</code> · finans</td></tr>
-        <tr><td>legal_user</td>     <td><code>legal123</code> · hukuk</td></tr>
-        <tr><td>marketing_user</td> <td><code>mkt123</code> · pazarlama</td></tr>
-        <tr><td>guest</td>          <td><code>guest</code> · genel</td></tr>
+    <details style="margin-top:1.25rem;" open>
+      <summary class="muted" style="cursor:pointer;">Demo hesaplari — doldurmak icin satira tiklayin</summary>
+      <table class="kv demo-accounts" style="margin-top:0.5rem;">
+        <tr data-u="admin"          data-p="admin"    style="cursor:pointer;"><td>admin</td>          <td><code>admin</code> · yonetici</td></tr>
+        <tr data-u="dev_user"       data-p="dev123"   style="cursor:pointer;"><td>dev_user</td>       <td><code>dev123</code> · muhendislik</td></tr>
+        <tr data-u="hr_user"        data-p="hr123"    style="cursor:pointer;"><td>hr_user</td>        <td><code>hr123</code> · IK</td></tr>
+        <tr data-u="finance_user"   data-p="fin123"   style="cursor:pointer;"><td>finance_user</td>   <td><code>fin123</code> · finans</td></tr>
+        <tr data-u="legal_user"     data-p="legal123" style="cursor:pointer;"><td>legal_user</td>     <td><code>legal123</code> · hukuk</td></tr>
+        <tr data-u="marketing_user" data-p="mkt123"   style="cursor:pointer;"><td>marketing_user</td> <td><code>mkt123</code> · pazarlama</td></tr>
+        <tr data-u="guest"          data-p="guest"    style="cursor:pointer;"><td>guest</td>          <td><code>guest</code> · genel</td></tr>
       </table>
     </details>
     {% endif %}
@@ -47,11 +47,21 @@
 {% endblock %}
 {% block scripts %}
 <script>
+  // Demo tablosunda satira tiklayinca formu doldur (yazim/kopyalama hatasi sifirlanir)
+  document.querySelectorAll(".demo-accounts tr[data-u]").forEach((tr) => {
+    tr.addEventListener("click", () => {
+      document.getElementById("username").value = tr.dataset.u;
+      document.getElementById("password").value = tr.dataset.p;
+      document.getElementById("loginError").classList.add("hidden");
+      document.getElementById("loginForm").querySelector("button[type=submit]").focus();
+    });
+  });
+
   document.getElementById("loginForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     const err = document.getElementById("loginError");
     err.classList.add("hidden");
-    const username = document.getElementById("username").value;
+    const username = document.getElementById("username").value.trim();
     const password = document.getElementById("password").value;
     const btn = e.target.querySelector("button");
     btn.disabled = true; btn.textContent = "Giris yapiliyor...";
