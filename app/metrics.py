@@ -56,6 +56,12 @@ MODEL_PULL_PROGRESS = Gauge(
     ["model"],
 )
 
+MODEL_MEMORY_BYTES = Gauge(
+    "ai_gateway_model_memory_bytes",
+    "Bellekte oturan modelin boyutu (kind=vram|ram)",
+    ["model", "kind"],
+)
+
 HARDWARE_INFO = Gauge(
     "ai_gateway_hardware_info",
     "Donanim profili (sabit deger 1, etiketlerde detay)",

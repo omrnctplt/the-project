@@ -228,6 +228,27 @@ tier'ina gore siralanir.
 - **Idle unload:** `IDLE_UNLOAD_MINUTES` boyunca istek almayan model RAM/VRAM'dan
   cikarilir (`keep_alive=0`), durumu `ready`'ye doner.
 
+### Bellek yerlesimi: diskte olmak ≠ bellekte olmak
+
+Bir modelin indirilmis (diskte) olmasi onun surekli RAM/VRAM isgal ettigi
+anlamina gelmez — Ollama modelleri istek geldikce yukler, keep-alive dolunca
+bosaltir. Bu ayrimi gorunur kilan katman:
+
+- **`GET /api/v1/system/memory`** — Ollama'nin `/api/ps` (bellekte oturanlar:
+  toplam boyut, VRAM/RAM dagilimi, keep-alive bitisine kalan sure) ve
+  `/api/tags` (diskteki boyutlar) ciktilarini gateway'in model durumlariyla
+  birlestirir. Ayni cagri **durum senkronu** da yapar: keep-alive dolup model
+  kendiliginden bosalmissa `loaded → ready`, dis kanaldan yuklenmisse tersi —
+  gosterilen tahmin degil, motorun bildirdigi gercektir.
+- **Bellek kokpiti (Genel bakis):** aktif calisan (istek isleyen) / bellege
+  yuklenen / bellekte sicak bekleyen / diskte hazir gruplari; model basina
+  renkli segmentli butce cubugu; 4 sn'de bir canli (sekme gizliyken durur).
+- **Manuel kontrol (admin):** `POST /api/v1/system/models/{id}/load` modeli
+  ilk istegi beklemeden bellege isitir (bos prompt'lu generate — uretim ve
+  istatistik tetiklemez, arka planda calisir); `POST .../unload` aninda bosaltir.
+- **Gozlemlenebilirlik:** `ai_gateway_model_memory_bytes{model,kind=vram|ram}`
+  gauge'u ile Grafana'da model basina bellek zaman serisi.
+
 ### Indirme ilerlemesinin kullaniciya yansimasi
 
 | Yer | Ne gorunur |
@@ -300,6 +321,9 @@ Interaktif dokumantasyon: **`/docs`** (Swagger) ve **`/redoc`**.
 | POST | `/api/v1/system/pull/{model_id}` | admin | Indirmeyi baslat (arka planda, canli izlenir) |
 | DELETE | `/api/v1/system/pull/{model_id}` | admin | **Suren indirmeyi iptal et** (kalintilar janitor'ca temizlenir) |
 | DELETE | `/api/v1/system/models/{model_id}/pulled` | admin | Modeli Ollama'dan sil (disk bosalt; katalog kaydi kalir) |
+| GET | `/api/v1/system/memory` | user | Canli bellek yerlesimi: loaded/VRAM/RAM/disk + keep-alive sureleri + toplamlar |
+| POST | `/api/v1/system/models/{model_id}/load` | admin | Modeli bellege onceden yukle (warmup, arka planda) |
+| POST | `/api/v1/system/models/{model_id}/unload` | admin | Modeli RAM/VRAM'dan cikar (disk kopyasi korunur) |
 
 ### Sistem & profil
 
@@ -343,7 +367,7 @@ Interaktif dokumantasyon: **`/docs`** (Swagger) ve **`/redoc`**.
 |---|---|---|
 | `/ui/login` | herkes | Giris (DEMO_MODE'da demo hesap listesi) |
 | `/ui/onboarding` | admin | Ilk acilis: donanim ozeti + onerilen model secimi |
-| `/ui/dashboard` | user | Donanim/kapasite/model durumu + SVG grafikler |
+| `/ui/dashboard` | user | Bellek kokpiti (canli RAM/VRAM yerlesimi) + donanim/kapasite/model durumu + SVG grafikler |
 | `/ui/chat` | user | Cok turlu sohbet, streaming, markdown, durdur/yeniden uret |
 | `/ui/models` | user (aksiyonlar admin) | Katalog + canli kesif + pull/iptal/sil, canli indirme ilerlemesi |
 | `/ui/admin` | admin | Profil, kullanici yonetimi, kullanim, denetim |
