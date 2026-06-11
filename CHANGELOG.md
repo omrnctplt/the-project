@@ -2,6 +2,17 @@
 
 Tum dikkat ceken degisiklikler bu dosyada listelenir. Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardina yakindir.
 
+## [0.10.0] - 2026-06-11
+
+Bellek kokpiti: "diskte olmak" ile "bellekte olmak" ayrimi artik tek bakista — sistem gercek anlamda yonetilebilir.
+
+### Added
+- **Bellek kokpiti (Genel bakis)** — canli RAM/VRAM yerlesimi, 4 sn'de bir guncellenir (sekme gizliyken durur). Gruplar: *aktif calisiyor* (istek isleyenler, canli nabiz), *bellege yukleniyor*, *bellekte hazir/sicak* (GPU+RAM dagilimi ve keep-alive geri sayimi: "~2 dk sonra otomatik bosalir"), *diskte hazir (bellekte degil)*; alt notta indirilmemis katalog modelleri ve **katalog disi Ollama modelleri** (boyutlariyla)
+- **Bellek butcesi cubugu** — yuklu her model ayri renk segmenti; ayrilan butceye karsi gercek doluluk
+- **`GET /api/v1/system/memory`** — Ollama `/api/ps` + `/api/tags` birlesimi: model basina loaded/vram_bytes/ram_bytes/disk_bytes/expires_in_seconds + toplamlar + butce; gateway'in model durumunu Ollama gercegiyle senkronlar (keep-alive dolup model kendiliginden bosalmissa `loaded → ready`)
+- **Bellege yukle / bellekten cikar** — `POST /api/v1/system/models/{id}/load` (arka planda warmup; ilk istegi beklemeden hazir tutar) ve `POST .../unload` (aninda RAM/VRAM bosaltir, disk kopyasi durur); kokpitte tek tik admin butonlari
+- **`ai_gateway_model_memory_bytes` metrigi** — model basina vram/ram dagilimi Prometheus'a; Grafana'da bellek zaman serisi cizilebilir
+
 ## [0.9.0] - 2026-06-11
 
 Model indirme/yukleme her an gorunur: arayuz hicbir asamada "donmus" gibi durmaz.

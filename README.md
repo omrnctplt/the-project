@@ -30,6 +30,7 @@ Kucuk ekipler icin Ollama'nin onunde duran bir yonlendirme katmani. Sistem ilk a
 - **Sistem kaynaklari sayfasi (admin):** Host CPU/mem/disk progress bar, top processes, Docker container stats, otomatik aksiyon onerileri
 - **Yonetim:** Profil/kullanicilar/kullanim/denetim tab'lari + sifre degistirme modal
 - **Genel bakis:** Donanim, kapasite, model durumu + **bagimliliksiz SVG grafikler** (bellek butcesi donut'u, model durumu barlari)
+- **Bellek kokpiti:** Diskte olmak ≠ bellekte olmak — canli RAM/VRAM yerlesimi (kaynak: Ollama `/api/ps`): aktif calisan / bellekte sicak bekleyen (GPU+RAM dagilimi, keep-alive geri sayimi) / diskte hazir modeller; admin tek tikla **bellege yukle / bellekten cikar**; model basina renkli butce cubugu
 - **Tema:** Acik / koyu / sistem temasi — kalici tercih, FOUC'suz on-yukleme
 - **Mobil + erisilebilirlik:** Hamburger drawer, dokunmatik uyum, dusuk-guc cihazda efekt kismasi, gorunur odak halkalari, `prefers-reduced-motion`
 
@@ -371,6 +372,9 @@ OpenAPI / Swagger: **http://localhost:7070/docs**
 | `POST /api/v1/system/pull/{model_id}` | Manuel pull tetikle (admin) |
 | `DELETE /api/v1/system/pull/{model_id}` | Suren indirmeyi iptal et — kalintilar otomatik temizlenir (admin) |
 | `DELETE /api/v1/system/models/{model_id}/pulled` | Modeli Ollama'dan sil, disk bosalt (admin) |
+| `GET  /api/v1/system/memory` | Canli bellek yerlesimi: kim RAM/VRAM'da, kim diskte, keep-alive sureleri |
+| `POST /api/v1/system/models/{model_id}/load` | Modeli bellege onceden yukle — warmup (admin) |
+| `POST /api/v1/system/models/{model_id}/unload` | Modeli RAM/VRAM'dan cikar, disk kopyasi durur (admin) |
 | `POST /api/v1/system/ollama/inspect` | Ollama'dan boyut tahmin et |
 | `GET  /api/v1/system/ollama/local` | Yerel Ollama modelleri (admin) |
 | `GET  /api/v1/system/discover` | Statik katalogdan onerilen + filtreli modeller |

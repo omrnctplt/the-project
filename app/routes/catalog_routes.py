@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import time
 from typing import Any
 
@@ -344,6 +345,64 @@ async def cancel_pull(
     if not cancelled:
         raise HTTPException(status_code=409, detail="Bu model icin suren bir indirme yok")
     return {"status": "cancelled", "model_id": model_id}
+
+
+@router.get("/api/v1/system/memory")
+async def memory_view(request: Request, _=Depends(auth.current_principal)) -> dict[str, Any]:
+    """Canli bellek yerlesimi: aktif calisan / bellekte hazir / diskte modeller."""
+    state = get_state(request)
+    if not state.orchestrator:
+        return {
+            "reachable": False, "models": [], "unmanaged": [],
+            "totals": {"loaded_count": 0, "memory_bytes": 0, "vram_bytes": 0, "ram_bytes": 0, "disk_bytes": 0},
+            "budget": {},
+        }
+    snapshot = await state.orchestrator.memory_snapshot()
+    cap = state.capacity or {}
+    snapshot["budget"] = {
+        "total_gb": cap.get("budget_total_gb"),
+        "used_gb": cap.get("budget_used_gb"),
+        "accelerator": cap.get("accelerator"),
+        "profile": cap.get("profile"),
+    }
+    return snapshot
+
+
+@router.post("/api/v1/system/models/{model_id}/load")
+async def load_model_into_memory(
+    model_id: str,
+    request: Request,
+    _=Depends(auth.require_admin),
+) -> dict[str, Any]:
+    """Modeli bellege onceden yukler (warmup) — arka planda calisir."""
+    state = get_state(request)
+    if not state.orchestrator:
+        raise HTTPException(status_code=503, detail="Orchestrator hazir degil")
+    mstate = state.orchestrator.get_state(model_id)
+    if not mstate:
+        raise HTTPException(status_code=404, detail=f"Model bulunamadi: {model_id}")
+    if not mstate.pulled:
+        raise HTTPException(status_code=409, detail="Model once indirilmeli (pull)")
+    if mstate.warming_up:
+        return {"status": "loading", "model_id": model_id}
+    state.tasks.append(asyncio.create_task(state.orchestrator.load_model(model_id)))
+    return {"status": "loading", "model_id": model_id}
+
+
+@router.post("/api/v1/system/models/{model_id}/unload")
+async def unload_model_from_memory(
+    model_id: str,
+    request: Request,
+    _=Depends(auth.require_admin),
+) -> dict[str, Any]:
+    """Modeli RAM/VRAM'dan cikarir; disk kopyasi korunur."""
+    state = get_state(request)
+    if not state.orchestrator:
+        raise HTTPException(status_code=503, detail="Orchestrator hazir degil")
+    if not state.orchestrator.get_state(model_id):
+        raise HTTPException(status_code=404, detail=f"Model bulunamadi: {model_id}")
+    await state.orchestrator.unload_model(model_id)
+    return {"status": "unloaded", "model_id": model_id}
 
 
 @router.delete("/api/v1/system/models/{model_id}/pulled")

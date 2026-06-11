@@ -110,6 +110,17 @@ async def metrics_endpoint(request: Request) -> Any:
         try:
             running = await state.orchestrator.client.list_running()
             metrics.LOADED_MODELS.set(len(running))
+            tag_to_model = {
+                st["ollama_tag"]: st["model_id"] for st in state.orchestrator.states()
+            }
+            metrics.MODEL_MEMORY_BYTES.clear()
+            for m in running:
+                name = str(m.get("name") or m.get("model") or "")
+                model_id = tag_to_model.get(name) or tag_to_model.get(name.removesuffix(":latest")) or name
+                size = int(m.get("size") or 0)
+                vram = int(m.get("size_vram") or 0)
+                metrics.MODEL_MEMORY_BYTES.labels(model=model_id, kind="vram").set(vram)
+                metrics.MODEL_MEMORY_BYTES.labels(model=model_id, kind="ram").set(max(0, size - vram))
         except Exception:
             pass
         for st in state.orchestrator.states():

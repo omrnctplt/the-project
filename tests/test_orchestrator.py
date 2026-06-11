@@ -25,9 +25,14 @@ class FakeClient:
         self.generated: list[tuple[str, str]] = []
         self.unloaded: list[str] = []
         self.deleted: list[str] = []
+        self.local: list[dict] = []
+        self.running: list[dict] = []
 
     async def list_local(self):
-        return []
+        return self.local
+
+    async def list_running(self):
+        return self.running
 
     async def pull(self, tag):
         self.pulled.append(tag)
@@ -313,6 +318,88 @@ def test_pull_initial_seeds_when_auto_pull_on():
     o, fake = _orch(auto_pull=True)
     asyncio.run(o.pull_initial())
     assert "fb:1" in fake.pulled
+
+
+def test_memory_snapshot_groups_and_syncs_status():
+    o, fake = _orch()
+    asyncio.run(o.ensure_pulled("fb"))
+    o.get_state("fb").status = "loaded"
+    fake.local = [
+        {"name": "fb:1", "size": 700_000_000},
+        {"name": "txt:1", "size": 2_000_000_000},
+        {"name": "baska:7b", "size": 4_000_000_000},
+    ]
+    fake.running = [
+        {"name": "txt:1", "size": 2_100_000_000, "size_vram": 1_600_000_000,
+         "expires_at": "2099-01-01T00:00:00Z"},
+    ]
+    snap = asyncio.run(o.memory_snapshot())
+    by_id = {m["model_id"]: m for m in snap["models"]}
+
+    assert by_id["txt"]["loaded"] is True
+    assert by_id["txt"]["vram_bytes"] == 1_600_000_000
+    assert by_id["txt"]["ram_bytes"] == 500_000_000
+    assert by_id["txt"]["expires_in_seconds"] > 0
+    assert o.get_state("txt").status == "loaded"
+    assert o.get_state("txt").pulled is True
+
+    assert by_id["fb"]["loaded"] is False
+    assert by_id["fb"]["disk_bytes"] == 700_000_000
+    assert o.get_state("fb").status == "ready"
+
+    assert len(snap["unmanaged"]) == 1
+    assert snap["unmanaged"][0]["ollama_tag"] == "baska:7b"
+    assert snap["totals"]["loaded_count"] == 1
+    assert snap["totals"]["memory_bytes"] == 2_100_000_000
+    assert snap["totals"]["vram_bytes"] == 1_600_000_000
+    assert snap["totals"]["disk_bytes"] == 6_700_000_000
+    assert snap["reachable"] is True
+
+
+def test_memory_snapshot_unreachable_keeps_state():
+    class DeadClient(FakeClient):
+        async def list_running(self):
+            raise RuntimeError("ollama kapali")
+
+    o, _ = _orch(client=DeadClient())
+    asyncio.run(o.ensure_pulled("fb"))
+    o.get_state("fb").status = "loaded"
+    snap = asyncio.run(o.memory_snapshot())
+    assert snap["reachable"] is False
+    assert o.get_state("fb").status == "loaded"
+
+
+def test_load_model_warms_into_memory():
+    o, fake = _orch()
+    asyncio.run(o.ensure_pulled("fb"))
+    asyncio.run(o.load_model("fb"))
+    st = o.get_state("fb")
+    assert st.status == "loaded"
+    assert st.warming_up is False
+    assert fake.generated[-1] == ("fb:1", "")
+
+
+def test_load_model_requires_pulled():
+    o, _ = _orch()
+    with pytest.raises(OllamaError):
+        asyncio.run(o.load_model("fb"))
+
+
+def test_unload_model_sets_ready():
+    o, fake = _orch()
+    asyncio.run(o.ensure_pulled("fb"))
+    o.get_state("fb").status = "loaded"
+    asyncio.run(o.unload_model("fb"))
+    assert o.get_state("fb").status == "ready"
+    assert "fb:1" in fake.unloaded
+
+
+def test_parse_expires_in_seconds_variants():
+    assert orchestrator_mod._parse_expires_in_seconds("2099-06-11T19:12:13.123456789+03:00") > 0
+    assert orchestrator_mod._parse_expires_in_seconds("2001-01-01T00:00:00Z") == 0.0
+    assert orchestrator_mod._parse_expires_in_seconds("0001-01-01T00:00:00Z") is None
+    assert orchestrator_mod._parse_expires_in_seconds(None) is None
+    assert orchestrator_mod._parse_expires_in_seconds("bozuk-deger") is None
 
 
 def test_sweep_stale_partials_removes_only_old_files(tmp_path, monkeypatch):

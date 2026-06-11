@@ -150,4 +150,137 @@
     if (status === "passive") return "plain";
     return "plain";
   }
+
+  /* ---------- Bellek kokpiti: canli RAM/VRAM yerlesimi ----------
+     Diskte olmak != bellekte olmak. Kaynak Ollama /api/ps oldugundan
+     gosterilen, tahmin degil gercek yerlesimdir. */
+  const isAdmin = (window.currentUser || {}).role === "admin";
+  const memGroups = document.getElementById("memGroups");
+  const memBar = document.getElementById("memBar");
+  const memLegend = document.getElementById("memLegend");
+  const memSummary = document.getElementById("memSummary");
+  const MEM_PALETTE = ["var(--accent)", "var(--teal)", "var(--warn)", "var(--ok)", "var(--danger)", "var(--muted-2)"];
+
+  const gbOf = (bytes) => (bytes || 0) / 1024 ** 3;
+  const fmtGb = (bytes, d = 1) => fmtNumber(gbOf(bytes), d) + " GB";
+
+  async function refreshMemory(force = false) {
+    if (!memGroups || (!force && document.hidden)) return;
+    let snap;
+    try { snap = await api("/api/v1/system/memory"); } catch { return; }
+    renderMemory(snap);
+  }
+
+  function memRows(list, kind) {
+    return list.map(m => {
+      const place = m.loaded
+        ? [m.vram_bytes ? `GPU ${fmtGb(m.vram_bytes)}` : "", m.ram_bytes ? `RAM ${fmtGb(m.ram_bytes)}` : ""].filter(Boolean).join(" + ")
+        : kind === "active"
+        ? "bellege yukleniyor…"
+        : (m.disk_bytes ? `diskte ${fmtGb(m.disk_bytes)}` : "");
+      const extra = kind === "active"
+        ? `<span class="badge busy">${m.inflight_requests} istek isleniyor</span>`
+        : kind === "warm" && m.expires_in_seconds != null
+        ? `<span class="muted mem-exp">~${fmtEta(m.expires_in_seconds)} sonra otomatik bosalir</span>`
+        : kind === "warming"
+        ? `<span class="spin" aria-hidden="true"></span>`
+        : "";
+      let act = "";
+      if (isAdmin) {
+        if (kind === "warm") act = `<button class="small" data-mem="unload" data-mid="${escapeHtml(m.model_id)}">Bellekten cikar</button>`;
+        if (kind === "disk") act = `<button class="small" data-mem="load" data-mid="${escapeHtml(m.model_id)}">Bellege yukle</button>`;
+      }
+      return `<div class="mem-row">
+          <span class="mem-dot ${kind}" aria-hidden="true"></span>
+          <span class="mem-name">${escapeHtml(m.model_id)}</span>
+          <span class="mem-place">${escapeHtml(place)}</span>
+          ${extra}
+          <span class="mem-act">${act}</span>
+        </div>`;
+    }).join("");
+  }
+
+  function renderMemory(snap) {
+    const models = snap.models || [];
+    const totals = snap.totals || {};
+    const budget = snap.budget || {};
+    if (!snap.reachable) {
+      memSummary.textContent = "Ollama'ya ulasilamiyor";
+      memBar.innerHTML = "";
+      memLegend.innerHTML = "";
+      memGroups.innerHTML = `<div class="muted mem-empty">Motor (Ollama) erisilebilir oldugunda gercek bellek yerlesimi burada canli gorunur.</div>`;
+      return;
+    }
+    const active = models.filter(m => m.pulled && m.inflight_requests > 0);
+    const warming = models.filter(m => m.warming_up && m.inflight_requests === 0);
+    const warm = models.filter(m => m.loaded && m.inflight_requests === 0 && !m.warming_up);
+    const onDisk = models.filter(m => m.pulled && !m.loaded && !m.warming_up && m.inflight_requests === 0);
+    const notPulled = models.filter(m => !m.pulled && !m.warming_up);
+
+    memSummary.textContent =
+      `${totals.loaded_count || 0} model bellekte (${fmtGb(totals.memory_bytes)})` +
+      (totals.vram_bytes ? ` · GPU'da ${fmtGb(totals.vram_bytes)}` : "") +
+      ` · diskte toplam ${fmtGb(totals.disk_bytes)}`;
+
+    const loaded = models.filter(m => m.loaded);
+    const budgetBytes = (budget.total_gb || 0) * 1024 ** 3;
+    const denom = Math.max(budgetBytes, totals.memory_bytes || 0, 1);
+    memBar.innerHTML = loaded.map((m, i) =>
+      `<div class="mem-seg" style="width:${Math.max(1, (m.memory_bytes / denom) * 100).toFixed(2)}%; background:${MEM_PALETTE[i % MEM_PALETTE.length]};" title="${escapeHtml(m.model_id)}: ${fmtGb(m.memory_bytes)}"></div>`
+    ).join("");
+    memLegend.innerHTML =
+      loaded.map((m, i) =>
+        `<span class="mem-key"><span class="dot" style="background:${MEM_PALETTE[i % MEM_PALETTE.length]};"></span>${escapeHtml(m.model_id)} · ${fmtGb(m.memory_bytes)}</span>`
+      ).join("") +
+      (budget.total_gb
+        ? `<span class="mem-key muted">ayrilan butce: ${fmtNumber(budget.total_gb, 1)} GB (${escapeHtml((budget.accelerator || "?").toUpperCase())})</span>`
+        : "");
+
+    const bits = [];
+    if (notPulled.length) bits.push(`${notPulled.length} katalog modeli henuz indirilmemis`);
+    if ((snap.unmanaged || []).length) {
+      bits.push("Katalog disi (Ollama'da): " + snap.unmanaged
+        .map(u => `${u.ollama_tag} (${fmtGb(u.disk_bytes)}${u.loaded ? ", bellekte" : ""})`).join(", "));
+    }
+    const footer = bits.length ? `<div class="muted mem-foot">${escapeHtml(bits.join(" · "))}</div>` : "";
+
+    const groups = [
+      { key: "active", title: "Aktif calisiyor", list: active, empty: "Su anda istek isleyen model yok." },
+      { key: "warming", title: "Bellege yukleniyor", list: warming, hideEmpty: true },
+      { key: "warm", title: "Bellekte hazir (sicak)", list: warm, empty: "Bellekte bekleyen model yok — ilk istekte otomatik yuklenir." },
+      { key: "disk", title: "Diskte hazir (bellekte degil)", list: onDisk, empty: "Indirilmis ama bellekte olmayan model yok." },
+    ];
+    memGroups.innerHTML = groups.map(g => {
+      if (g.hideEmpty && !g.list.length) return "";
+      return `<div class="mem-group">
+          <div class="mem-group-title">${g.title} <span class="count">${g.list.length}</span></div>
+          ${g.list.length ? memRows(g.list, g.key) : `<div class="muted mem-empty">${g.empty}</div>`}
+        </div>`;
+    }).join("") + footer;
+  }
+
+  if (memGroups) {
+    memGroups.addEventListener("click", async (e) => {
+      const btn = e.target.closest("button[data-mem]");
+      if (!btn) return;
+      btn.disabled = true;
+      const mid = btn.dataset.mid;
+      try {
+        if (btn.dataset.mem === "load") {
+          await api(`/api/v1/system/models/${encodeURIComponent(mid)}/load`, { method: "POST" });
+          toast(`${mid} bellege yukleniyor — hazir olunca "sicak" grubuna gecer`, "ok", 4000);
+        } else {
+          await api(`/api/v1/system/models/${encodeURIComponent(mid)}/unload`, { method: "POST" });
+          toast(`${mid} bellekten cikarildi (disk kopyasi duruyor)`, "ok", 4000);
+        }
+        setTimeout(refreshMemory, 600);
+      } catch (err) {
+        toast("Hata: " + err.message, "error", 5000);
+        btn.disabled = false;
+      }
+    });
+    refreshMemory(true);
+    setInterval(() => refreshMemory(), 4000);
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshMemory(); });
+  }
 })();

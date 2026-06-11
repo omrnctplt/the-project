@@ -72,6 +72,32 @@ def test_resources_endpoint_admin_only(client):
     assert r.status_code == 200
 
 
+def test_memory_endpoint_returns_snapshot(client):
+    tok = _token(client, "marketing_user", "mkt123")
+    r = client.get("/api/v1/system/memory", headers={"Authorization": f"Bearer {tok}"})
+    assert r.status_code == 200
+    body = r.json()
+    assert "models" in body and "totals" in body and "budget" in body
+    assert "loaded_count" in body["totals"]
+
+
+def test_memory_load_unload_admin_gates(client):
+    user_tok = _token(client, "marketing_user", "mkt123")
+    admin_tok = _token(client, "admin", "admin")
+    user_h = {"Authorization": f"Bearer {user_tok}"}
+    admin_h = {"Authorization": f"Bearer {admin_tok}"}
+
+    assert client.post("/api/v1/system/models/x/load", headers=user_h).status_code == 403
+    assert client.post("/api/v1/system/models/yok-boyle/load", headers=admin_h).status_code == 404
+    assert client.post("/api/v1/system/models/yok-boyle/unload", headers=admin_h).status_code == 404
+
+    states = client.get("/api/v1/models", headers=admin_h).json().get("states") or []
+    if states:
+        mid = states[0]["model_id"]
+        r = client.post(f"/api/v1/system/models/{mid}/load", headers=admin_h)
+        assert r.status_code == 409  # Ollama yok, model indirilmemis
+
+
 def test_catalog_model_rejects_markup_in_tag(client):
     tok = _token(client, "admin", "admin")
     r = client.post(

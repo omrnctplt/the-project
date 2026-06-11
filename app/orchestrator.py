@@ -14,8 +14,10 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import re
 import time
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, AsyncIterator
 
@@ -57,6 +59,26 @@ def remove_partial_blobs(digests: set[str]) -> int:
     return removed
 
 
+def _normalize_tag(name: str) -> str:
+    return name if ":" in name else f"{name}:latest"
+
+
+def _parse_expires_in_seconds(raw: Any) -> float | None:
+    """Ollama /api/ps 'expires_at' (RFC3339, nanosaniye hassasiyetli) -> kalan sn."""
+    if not raw:
+        return None
+    text = re.sub(r"\.(\d{1,6})\d*", r".\1", str(raw))
+    try:
+        dt = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    if dt.year <= 1:
+        return None
+    return max(0.0, (dt - datetime.now(timezone.utc)).total_seconds())
+
+
 def sweep_stale_partials(max_age_hours: float = STALE_PARTIAL_MAX_AGE_HOURS) -> int:
     """Acilista eski `-partial` kalintilarini temizler (yarim kalan indirmeler).
 
@@ -95,6 +117,7 @@ class ModelState:
     pull_started_at: float = 0.0
     pull_digests: set[str] = field(default_factory=set)
     pulled: bool = False
+    warming_up: bool = False
     error: str | None = None
     inflight_requests: int = 0
     total_requests: int = 0
@@ -126,6 +149,7 @@ class ModelState:
             "pull_eta_seconds": (
                 round(self.pull_eta_seconds) if self.pull_eta_seconds is not None else None
             ),
+            "warming_up": self.warming_up,
             "inflight_requests": self.inflight_requests,
             "total_requests": self.total_requests,
             "avg_latency_ms": (
@@ -204,6 +228,131 @@ class Orchestrator:
             return None
         actives.sort(key=lambda s: (s.inflight_requests, -s.total_requests))
         return actives[0].model_id
+
+    async def memory_snapshot(self) -> dict[str, Any]:
+        """Gercek bellek yerlesimi — tek bakista 'kim diskte, kim bellekte'.
+
+        Kaynak Ollama'nin kendisi: /api/ps (RAM/VRAM'de oturanlar + keep_alive
+        bitisi) ve /api/tags (diskteki boyutlar). Gateway'in status alani
+        Ollama gercegiyle senkronlanir: keep_alive dolup model kendiliginden
+        bosalmissa 'loaded' -> 'ready', dis kanaldan yuklenmisse tersi.
+        """
+        reachable = True
+        try:
+            running, local = await asyncio.gather(
+                self.client.list_running(), self.client.list_local()
+            )
+        except Exception as exc:
+            log.warning("Bellek goruntusu alinamadi: %s", exc)
+            running, local, reachable = [], [], False
+
+        running_by_tag: dict[str, dict[str, Any]] = {}
+        for m in running:
+            name = str(m.get("name") or m.get("model") or "")
+            if name:
+                running_by_tag[_normalize_tag(name)] = m
+        disk_by_tag: dict[str, dict[str, Any]] = {}
+        for m in local:
+            name = str(m.get("name") or "")
+            if name:
+                disk_by_tag[_normalize_tag(name)] = m
+
+        models: list[dict[str, Any]] = []
+        managed_tags: set[str] = set()
+        for state in self._states.values():
+            tag = _normalize_tag(state.ollama_tag)
+            managed_tags.add(tag)
+            run = running_by_tag.get(tag)
+            disk = disk_by_tag.get(tag)
+            if reachable:
+                if disk is not None and not state.pulled:
+                    state.pulled = True
+                    if state.status == "unknown":
+                        state.status = "ready"
+                if run is not None and state.status in ("ready", "unknown"):
+                    state.pulled = True
+                    state.status = "loaded"
+                elif run is None and state.status == "loaded":
+                    state.status = "ready"
+            size = int((run or {}).get("size") or 0)
+            size_vram = int((run or {}).get("size_vram") or 0)
+            models.append({
+                **state.to_public(),
+                "loaded": run is not None,
+                "memory_bytes": size,
+                "vram_bytes": size_vram,
+                "ram_bytes": max(0, size - size_vram),
+                "expires_in_seconds": _parse_expires_in_seconds((run or {}).get("expires_at")),
+                "disk_bytes": int((disk or {}).get("size") or 0),
+            })
+
+        unmanaged: list[dict[str, Any]] = []
+        for tag, disk in disk_by_tag.items():
+            if tag in managed_tags:
+                continue
+            run = running_by_tag.get(tag)
+            size = int((run or {}).get("size") or 0)
+            size_vram = int((run or {}).get("size_vram") or 0)
+            unmanaged.append({
+                "ollama_tag": tag,
+                "disk_bytes": int(disk.get("size") or 0),
+                "loaded": run is not None,
+                "memory_bytes": size,
+                "vram_bytes": size_vram,
+                "ram_bytes": max(0, size - size_vram),
+            })
+
+        total_mem = sum(int(m.get("size") or 0) for m in running)
+        total_vram = sum(int(m.get("size_vram") or 0) for m in running)
+        return {
+            "reachable": reachable,
+            "models": models,
+            "unmanaged": unmanaged,
+            "totals": {
+                "loaded_count": len(running),
+                "memory_bytes": total_mem,
+                "vram_bytes": total_vram,
+                "ram_bytes": max(0, total_mem - total_vram),
+                "disk_bytes": sum(int(m.get("size") or 0) for m in local),
+            },
+        }
+
+    async def load_model(self, model_id: str) -> None:
+        """Modeli bellege onceden yukler — ilk istegi beklemeden hazir tutar.
+
+        Bos prompt'lu generate Ollama'da yalnizca yukleme yapar, uretim
+        calistirmaz; istatistikler etkilenmez.
+        """
+        state = self._states.get(model_id)
+        if not state:
+            raise KeyError(f"Bilinmeyen model: {model_id}")
+        if not state.pulled:
+            raise OllamaError(f"Model henuz indirilmemis: {model_id}")
+        state.warming_up = True
+        try:
+            await self.client.generate(
+                state.ollama_tag, prompt="",
+                keep_alive=f"{self.idle_unload_minutes}m",
+            )
+            state.status = "loaded"
+            state.last_used_at = time.time()
+            state.error = None
+            log.info("Model bellege yuklendi: %s", state.ollama_tag)
+        except Exception as exc:
+            state.error = f"Bellege yukleme hatasi: {exc}"
+            log.warning("Bellege yukleme basarisiz [%s]: %s", state.ollama_tag, exc)
+        finally:
+            state.warming_up = False
+
+    async def unload_model(self, model_id: str) -> None:
+        """Modeli RAM/VRAM'dan cikarir; diskte kalir, gerekince yeniden yuklenir."""
+        state = self._states.get(model_id)
+        if not state:
+            raise KeyError(f"Bilinmeyen model: {model_id}")
+        await self.client.unload(state.ollama_tag)
+        if state.status == "loaded":
+            state.status = "ready"
+        log.info("Model bellekten cikarildi: %s", state.ollama_tag)
 
     async def refresh_pulled_flags(self) -> None:
         try:
