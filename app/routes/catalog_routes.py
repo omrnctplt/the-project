@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import time
 from typing import Any
 
@@ -325,10 +324,26 @@ async def pull_model(
         raise HTTPException(status_code=503, detail="Orchestrator hazir degil")
     if not state.orchestrator.get_state(model_id):
         raise HTTPException(status_code=404, detail=f"Model bulunamadi: {model_id}")
-    state.tasks.append(
-        asyncio.create_task(state.orchestrator.ensure_pulled(model_id))
-    )
+    state.tasks.append(state.orchestrator.start_pull(model_id))
     return {"status": "pull_started", "model_id": model_id}
+
+
+@router.delete("/api/v1/system/pull/{model_id}")
+async def cancel_pull(
+    model_id: str,
+    request: Request,
+    _=Depends(auth.require_admin),
+) -> dict[str, Any]:
+    """Suren indirmeyi iptal eder; yarim kalan blob dosyalari temizlenir."""
+    state = get_state(request)
+    if not state.orchestrator:
+        raise HTTPException(status_code=503, detail="Orchestrator hazir degil")
+    if not state.orchestrator.get_state(model_id):
+        raise HTTPException(status_code=404, detail=f"Model bulunamadi: {model_id}")
+    cancelled = await state.orchestrator.cancel_pull(model_id)
+    if not cancelled:
+        raise HTTPException(status_code=409, detail="Bu model icin suren bir indirme yok")
+    return {"status": "cancelled", "model_id": model_id}
 
 
 @router.delete("/api/v1/system/models/{model_id}/pulled")

@@ -13,13 +13,70 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, AsyncIterator
 
 from .ollama_client import OllamaClient, OllamaError
 
 log = logging.getLogger(__name__)
+
+OLLAMA_MODELS_DIR = os.getenv("OLLAMA_MODELS_DIR", "")
+STALE_PARTIAL_MAX_AGE_HOURS = float(os.getenv("STALE_PARTIAL_MAX_AGE_HOURS", "24") or 24)
+
+
+def _blobs_dir() -> Path | None:
+    if not OLLAMA_MODELS_DIR:
+        return None
+    blobs = Path(OLLAMA_MODELS_DIR) / "blobs"
+    return blobs if blobs.is_dir() else None
+
+
+def remove_partial_blobs(digests: set[str]) -> int:
+    """Iptal edilen pull'un yarim kalan blob dosyalarini siler.
+
+    Yalnizca `-partial` sonekli dosyalara dokunur — tamamlanmis blob'lar ve
+    diger modellerin katmanlari guvendedir.
+    """
+    blobs = _blobs_dir()
+    if not blobs or not digests:
+        return 0
+    removed = 0
+    for digest in digests:
+        stem = digest.replace(":", "-")
+        for f in blobs.glob(f"{stem}-partial*"):
+            try:
+                f.unlink()
+                removed += 1
+            except OSError as exc:
+                log.warning("Partial blob silinemedi [%s]: %s", f.name, exc)
+    if removed:
+        log.info("%d yarim blob dosyasi temizlendi", removed)
+    return removed
+
+
+def sweep_stale_partials(max_age_hours: float = STALE_PARTIAL_MAX_AGE_HOURS) -> int:
+    """Acilista eski `-partial` kalintilarini temizler (yarim kalan indirmeler).
+
+    Taze partial'lar korunur: Ollama yeniden pull'da kaldigi yerden devam eder.
+    """
+    blobs = _blobs_dir()
+    if not blobs:
+        return 0
+    cutoff = time.time() - max_age_hours * 3600
+    removed = 0
+    for f in blobs.glob("sha256-*-partial*"):
+        try:
+            if f.stat().st_mtime < cutoff:
+                f.unlink()
+                removed += 1
+        except OSError as exc:
+            log.warning("Eski partial temizlenemedi [%s]: %s", f.name, exc)
+    if removed:
+        log.info("Acilis temizligi: %d eski yarim blob silindi (>%.0f saat)", removed, max_age_hours)
+    return removed
 
 
 @dataclass
@@ -27,15 +84,32 @@ class ModelState:
     model_id: str
     ollama_tag: str
     category: str
-    status: str = "unknown"          # unknown | pulling | ready | loaded | error | passive
+    status: str = "unknown"          # unknown | queued | pulling | ready | loaded | error | passive
     last_used_at: float = 0.0
     last_pull_progress: float = 0.0
+    pull_stage: str | None = None
+    pull_completed_bytes: int = 0
+    pull_total_bytes: int = 0
+    pull_speed_bps: float = 0.0
+    pull_eta_seconds: float | None = None
+    pull_started_at: float = 0.0
+    pull_digests: set[str] = field(default_factory=set)
     pulled: bool = False
     error: str | None = None
     inflight_requests: int = 0
     total_requests: int = 0
     total_tokens: int = 0
     total_latency_ms: float = 0.0
+
+    def reset_pull_telemetry(self) -> None:
+        self.last_pull_progress = 0.0
+        self.pull_stage = None
+        self.pull_completed_bytes = 0
+        self.pull_total_bytes = 0
+        self.pull_speed_bps = 0.0
+        self.pull_eta_seconds = None
+        self.pull_started_at = 0.0
+        self.pull_digests = set()
 
     def to_public(self) -> dict[str, Any]:
         return {
@@ -44,7 +118,14 @@ class ModelState:
             "category": self.category,
             "status": self.status,
             "pulled": self.pulled,
-            "pull_progress": round(self.last_pull_progress, 2),
+            "pull_progress": round(self.last_pull_progress, 4),
+            "pull_stage": self.pull_stage,
+            "pull_completed_mb": round(self.pull_completed_bytes / 1024**2, 1),
+            "pull_total_mb": round(self.pull_total_bytes / 1024**2, 1),
+            "pull_speed_mbps": round(self.pull_speed_bps / 1024**2, 2),
+            "pull_eta_seconds": (
+                round(self.pull_eta_seconds) if self.pull_eta_seconds is not None else None
+            ),
             "inflight_requests": self.inflight_requests,
             "total_requests": self.total_requests,
             "avg_latency_ms": (
@@ -73,6 +154,8 @@ class Orchestrator:
         self._states: dict[str, ModelState] = {}
         self._pull_lock = asyncio.Lock()
         self._inflight_sem = asyncio.Semaphore(max(1, self.max_concurrent_requests))
+        self._bg_pulls: set[asyncio.Task] = set()
+        self._pull_tasks: dict[str, asyncio.Task] = {}
         models_def: dict[str, Any] = self.catalog.get("models", {}) or {}
         for mid in self.active_model_ids:
             m = models_def.get(mid)
@@ -113,7 +196,7 @@ class Orchestrator:
     def least_busy_active(self, category: str | None = None) -> str | None:
         actives = [
             s for s in self._states.values()
-            if s.status in ("ready", "loaded", "pulling")
+            if s.status in ("ready", "loaded", "pulling", "queued")
         ]
         if category:
             actives = [s for s in actives if s.category == category]
@@ -148,28 +231,180 @@ class Orchestrator:
             raise KeyError(f"Bilinmeyen model: {model_id}")
         if state.pulled:
             return
+        if self._pull_lock.locked() and state.status != "pulling":
+            state.status = "queued"
+            state.pull_stage = "sirada bekliyor"
+        try:
+            await self._pull_locked(model_id, state)
+        except asyncio.CancelledError:
+            if state.status == "queued":
+                state.status = "passive" if model_id in self.passive_model_ids else "unknown"
+                state.error = None
+                state.reset_pull_telemetry()
+                state.pull_stage = "iptal edildi"
+                log.info("Siradaki pull iptal edildi: %s", state.ollama_tag)
+            raise
+
+    async def _pull_locked(self, model_id: str, state: ModelState) -> None:
         async with self._pull_lock:
             if state.pulled:
+                if state.status == "queued":
+                    state.status = "ready"
                 return
             state.status = "pulling"
             state.error = None
+            state.reset_pull_telemetry()
+            state.pull_stage = "baslatiliyor"
+            state.pull_started_at = time.time()
+            layers: dict[str, tuple[int, int]] = {}
+            speed_t0 = time.monotonic()
+            speed_bytes0 = 0
             try:
                 async for event in self.client.pull(state.ollama_tag):
-                    total = event.get("total") or 0
-                    completed = event.get("completed") or 0
+                    stage = str(event.get("status") or "")
+                    if stage:
+                        state.pull_stage = stage
+                    digest = str(event.get("digest") or "")
+                    if digest:
+                        state.pull_digests.add(digest)
+                    total = int(event.get("total") or 0)
+                    completed = int(event.get("completed") or 0)
                     if total > 0:
-                        state.last_pull_progress = min(1.0, completed / total)
+                        layers[digest or stage or "_"] = (completed, total)
+                        agg_done = sum(c for c, _ in layers.values())
+                        agg_total = sum(t for _, t in layers.values())
+                        state.pull_completed_bytes = agg_done
+                        state.pull_total_bytes = agg_total
+                        state.last_pull_progress = min(1.0, agg_done / agg_total)
+                        now = time.monotonic()
+                        dt = now - speed_t0
+                        if dt >= 0.5:
+                            inst = max(0.0, (agg_done - speed_bytes0) / dt)
+                            state.pull_speed_bps = (
+                                inst if state.pull_speed_bps <= 0
+                                else 0.3 * inst + 0.7 * state.pull_speed_bps
+                            )
+                            speed_t0 = now
+                            speed_bytes0 = agg_done
+                            if state.pull_speed_bps > 0:
+                                state.pull_eta_seconds = max(
+                                    0.0, (agg_total - agg_done) / state.pull_speed_bps
+                                )
                     if event.get("status") == "success":
                         break
                 state.pulled = True
                 state.status = "ready"
                 state.last_pull_progress = 1.0
+                state.pull_stage = "success"
+                state.pull_speed_bps = 0.0
+                state.pull_eta_seconds = None
+                if state.pull_total_bytes:
+                    state.pull_completed_bytes = state.pull_total_bytes
                 log.info("Model indirildi: %s", state.ollama_tag)
+            except asyncio.CancelledError:
+                digests = set(state.pull_digests)
+                state.status = "passive" if model_id in self.passive_model_ids else "unknown"
+                state.error = None
+                state.reset_pull_telemetry()
+                state.pull_stage = "iptal edildi"
+                state.pull_digests = digests
+                log.info("Pull iptal edildi: %s", state.ollama_tag)
+                raise
             except Exception as exc:
                 state.status = "error"
                 state.error = str(exc)
                 log.error("Pull hatasi [%s]: %s", state.ollama_tag, exc)
                 raise
+
+    def _reap_pull_task(self, task: asyncio.Task) -> None:
+        self._bg_pulls.discard(task)
+        for mid, t in list(self._pull_tasks.items()):
+            if t is task:
+                self._pull_tasks.pop(mid, None)
+        if not task.cancelled():
+            task.exception()
+
+    def start_pull(self, model_id: str) -> asyncio.Task:
+        """Indirmeyi izlenebilir/iptal edilebilir arka plan gorevi olarak baslatir.
+
+        Ayni model icin suren bir gorev varsa onu dondurur (tek indirme).
+        """
+        state = self._states.get(model_id)
+        if not state:
+            raise KeyError(f"Bilinmeyen model: {model_id}")
+        existing = self._pull_tasks.get(model_id)
+        if existing and not existing.done():
+            return existing
+        task = asyncio.create_task(self.ensure_pulled(model_id))
+        self._pull_tasks[model_id] = task
+        self._bg_pulls.add(task)
+        task.add_done_callback(self._reap_pull_task)
+        return task
+
+    async def cancel_pull(self, model_id: str) -> bool:
+        """Suren indirmeyi durdurur ve yarim kalan dosyalari temizler."""
+        state = self._states.get(model_id)
+        if not state:
+            raise KeyError(f"Bilinmeyen model: {model_id}")
+        task = self._pull_tasks.get(model_id)
+        if not task or task.done():
+            return False
+        was_pulling = state.status == "pulling"
+        digests = set(state.pull_digests)
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+        except Exception:
+            pass
+        if was_pulling:
+            async with self._pull_lock:
+                await self.client.delete(state.ollama_tag)
+                remove_partial_blobs(digests)
+                if state.status not in ("pulling", "queued"):
+                    state.pull_digests = set()
+        return True
+
+    async def shutdown_pulls(self) -> list[str]:
+        """Tum suren/siradaki pull gorevlerini iptal eder (replan/kapanis icin).
+
+        Kesilen model id'lerini dondurur; cagiran taraf yeni orchestrator'da
+        bunlari start_pull ile devam ettirebilir (Ollama partial'dan surdurur).
+        """
+        active = {mid: t for mid, t in self._pull_tasks.items() if not t.done()}
+        for t in active.values():
+            t.cancel()
+        for t in active.values():
+            try:
+                await t
+            except asyncio.CancelledError:
+                pass
+            except Exception:
+                pass
+        return list(active.keys())
+
+    async def pull_events(self, model_id: str) -> AsyncIterator[dict[str, Any]]:
+        """Pull'u arka plan gorevi olarak baslatir, bitene kadar periyodik
+        ilerleme anlik goruntuleri uretir. Tuketici baglantiyi koparsa
+        indirme arka planda devam eder; hata son `await`te yukari tasinir.
+        """
+        state = self._states.get(model_id)
+        if not state:
+            raise KeyError(f"Bilinmeyen model: {model_id}")
+        if state.pulled:
+            return
+        task = self.start_pull(model_id)
+        yield state.to_public()
+        while not task.done():
+            await asyncio.wait({task}, timeout=0.7)
+            yield state.to_public()
+        try:
+            await task
+        except asyncio.CancelledError:
+            if task.cancelled():
+                raise OllamaError(f"Model indirmesi iptal edildi: {model_id}") from None
+            raise
 
     async def delete_model(self, model_id: str) -> bool:
         """Modeli Ollama'dan siler ve state'i 'indirilmemis' olarak gunceller."""
@@ -179,17 +414,21 @@ class Orchestrator:
         ok = await self.client.delete(state.ollama_tag)
         if ok:
             state.pulled = False
-            state.last_pull_progress = 0.0
+            state.reset_pull_telemetry()
             state.status = "passive" if model_id in self.passive_model_ids else "unknown"
             log.info("Model Ollama'dan silindi: %s", state.ollama_tag)
         return ok
 
     async def pull_initial(self) -> None:
-        """Bootstrap'ta sadece en kucuk 1 modeli (genelde fallback) indir.
+        """auto_pull aciksa en kucuk 1 modeli (genelde fallback) indir.
 
-        Diger modeller lazy: ilk istek geldiginde indirilir.
+        auto_pull kapaliyken (varsayilan) hicbir sey indirilmez — kullanici
+        secinceye kadar disk/ag yuku olmaz; yalnizca pulled bayraklari tazelenir.
         """
         await self.refresh_pulled_flags()
+        if not self.auto_pull:
+            log.info("auto_pull kapali; seed pull atlandi (lazy mod)")
+            return
         seed_id = self._pick_seed_model_id()
         if not seed_id:
             log.info("Bootstrap'ta indirilecek seed model bulunamadi.")
@@ -240,7 +479,13 @@ class Orchestrator:
                 raise OllamaError(
                     f"Model henuz indirilmemis ve auto_pull kapali: {model_id}"
                 )
-            await self.ensure_pulled(model_id)
+            task = self.start_pull(model_id)
+            try:
+                await asyncio.shield(task)
+            except asyncio.CancelledError:
+                if task.cancelled():
+                    raise OllamaError(f"Model indirmesi iptal edildi: {model_id}") from None
+                raise
 
         async with self._inflight_sem:
             state.inflight_requests += 1
@@ -288,7 +533,8 @@ class Orchestrator:
                 raise OllamaError(
                     f"Model henuz indirilmemis ve auto_pull kapali: {model_id}"
                 )
-            await self.ensure_pulled(model_id)
+            async for snapshot in self.pull_events(model_id):
+                yield {"_pull_progress": snapshot}
 
         async with self._inflight_sem:
             state.inflight_requests += 1

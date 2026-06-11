@@ -14,7 +14,7 @@
 
 https://:443 {
 	tls internal
-	reverse_proxy gateway:8080
+	reverse_proxy gateway:7070
 }
 
 # HTTP -> HTTPS yonlendirme

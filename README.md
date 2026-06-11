@@ -10,6 +10,8 @@
 
 Kucuk ekipler icin Ollama'nin onunde duran bir yonlendirme katmani. Sistem ilk acilista donanimi olcer, uygun **kapasite profilini** secer, **departman + prompt** tabanli akilli yonlendirme yapar, butun istekleri **denetler**. **Canli model kesfi** ollama.com + HuggingFace'ten guncel model listesini otomatik ceker — yeni bir model ciktiginda arayuzu veya katalogu elle guncellemek gerekmez. UI, REST API, Prometheus metrikleri ve Grafana paneli kutudan cikar cikmaz hazirdir.
 
+> 📘 **Derinlemesine dokumantasyon:** Mimari kararlar, teknoloji seciminin gerekceleri, tum API endpoint'leri, model yasam dongusu ve kapasite planlamasi icin **[docs/PROJE.md](docs/PROJE.md)**.
+
 ---
 
 ## Yetenekler
@@ -32,7 +34,7 @@ Kucuk ekipler icin Ollama'nin onunde duran bir yonlendirme katmani. Sistem ilk a
 - **Mobil + erisilebilirlik:** Hamburger drawer, dokunmatik uyum, dusuk-guc cihazda efekt kismasi, gorunur odak halkalari, `prefers-reduced-motion`
 
 ### Routing & kapasite
-- **4 profil:** `lite` (cok dusuk kaynak) / `balanced` (laptop) / `performance` (GPU) / `auto`
+- **4 profil:** `lite` (cok dusuk kaynak) / `balanced` (laptop) / `performance` (VRAM ≥ 12 GB GPU) / `auto`
 - **Departman bazli kaynak sinifi:** `light` / `medium` / `heavy` + `preferred_size`
 - **Prompt-aware:** Kisa prompt kucuk modele, uzun prompt buyuk modele yonlendirilir
 - **Keyword + always rule:** Kod blogu icin `code`, matematik icin `reasoning`, aksi halde departman primary
@@ -77,41 +79,63 @@ Ayrintili veri envanteri ve uyum onlemleri icin: **[SECURITY.md](SECURITY.md)**
 ### Gereksinimler
 - Docker Engine veya Docker Desktop
 - En az **6 GB RAM**, **20 GB disk**
-- GPU opsiyonel (NVIDIA Container Toolkit varsa kullanilir)
+- GPU opsiyonel — **NVIDIA ve AMD otomatik algilanir** (asagiya bakin)
 
-### 1. Tek komut
+### 1. Onerilen yol: `make up` (Linux/macOS) veya `scripts\up.ps1` (Windows)
+
+```bash
+make up                                              # Linux / macOS / Git Bash
+powershell -ExecutionPolicy Bypass -File scripts\up.ps1   # Windows PowerShell
+```
+
+**Neden bu yol?** Iki komut da ayni "anahtar teslim" akisi calistirir:
+1. **Preflight:** port cakismasi, Docker daemon, disk, RAM kontrolu — sorun varsa kurulumdan *once* soyler
+2. `.env` yoksa otomatik olusturur (`.env.example`'dan)
+3. **GPU otomatik algilama:** NVIDIA varsa `docker-compose.gpu.yml`, AMD varsa `docker-compose.rocm.yml` overlay'i kendiliginden eklenir; GPU yoksa CPU modunda devam eder — siz hicbir sey secmezsiniz
+4. Compose build + up (gateway, ollama, prometheus, grafana) ve servis URL'lerini yazdirir
+
+Algilamayi ezmek isterseniz: `GPU_MODE=cpu make up` (veya `nvidia` / `amd`;
+Windows'ta `scripts\up.ps1 -GpuMode cpu`).
+
+### 2. Alternatif: tek compose komutu
 
 ```bash
 docker compose up -d --build
 ```
 
-Hepsi bu. `.env` dosyasi gerekmez: `JWT_SECRET` otomatik uretilir, portlar ve
-limitler mantikli varsayilanlarla gelir, sistem ilk acilista donanimi olcup
-kendine uygun kapasite profilini secer.
+Calisir — `.env` bile gerekmez (`JWT_SECRET` otomatik uretilir, sistem acilista
+donanimi olcup kapasite profilini secer). Ancak bu yol **preflight ve GPU
+algilamayi atlar**: GPU'lu makinede CPU modunda kalirsiniz, port cakismasini
+compose hatasindan ogrenirsiniz. Bu yuzden varsayilan oneri `make up`'tir.
 
-GPU overlay ile (NVIDIA Container Toolkit gerekir):
+GPU overlay'lerini elle secmek isterseniz:
 ```bash
+# NVIDIA (NVIDIA Container Toolkit gerekir)
 docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
+# AMD (Linux + amdgpu surucusu; /dev/kfd mevcut olmali)
+docker compose -f docker-compose.yml -f docker-compose.rocm.yml up -d --build
 ```
 
-### 2. Alternatif: `make up` (preflight'li)
+### GPU destegi matrisi
 
-```bash
-make up
-```
+| Donanim | Linux | Windows (Docker Desktop) |
+|---|---|---|
+| NVIDIA | ✅ otomatik (`gpu` overlay; Container Toolkit gerekir) | ✅ otomatik (WSL2 GPU destegi acik olmali) |
+| AMD | ✅ otomatik (`rocm` overlay; amdgpu surucusu yeterli) | ❌ ROCm Windows Docker'da desteklenmez → CPU |
+| GPU yok | ✅ CPU modu | ✅ CPU modu |
 
-`make up` su adimlari yapar:
-1. **Preflight** (`scripts/preflight.sh` veya `.ps1`): port cakismasi, Docker daemon, disk, RAM kontrolu
-2. `.env` yoksa otomatik olusturur (`.env.example`'dan)
-3. Compose build + up (gateway, ollama, prometheus, grafana)
-4. Servis URL'lerini yazdirir
+Sistem her durumda acilista donanimi olcer (`hwprobe`): VRAM miktarina gore
+kapasite profili ve model onerileri otomatik sekillenir. AMD kartlarda VRAM,
+ROCm kurulumu gerektirmeden `amdgpu` sysfs arayuzunden okunur. Tuketici AMD
+kartlari (RX 6xxx/7xxx) icin gerekirse `.env`'de `HSA_OVERRIDE_GFX_VERSION`
+ayarlayin (ornek: RX 6700 XT → `10.3.0`).
 
 ### 3. UI'yi ac
 
 | URL | Aciklama |
 |---|---|
-| **http://localhost:8080** | Inference Hub — login → genel bakis |
-| http://localhost:8080/docs | OpenAPI / Swagger |
+| **http://localhost:7070** | Inference Hub — login → genel bakis |
+| http://localhost:7070/docs | OpenAPI / Swagger |
 | http://localhost:3000 | Grafana (`admin/admin`) |
 | http://localhost:9090 | Prometheus (`/alerts` ile alarm durumu) |
 | http://localhost:11434 | Dogrudan Ollama API |
@@ -149,7 +173,7 @@ git clone <repo> && cd the-project
 DEMO_MODE=false ADMIN_PASSWORD='guclu-bir-parola' docker compose up -d --build
 ```
 
-Gateway varsayilan olarak `0.0.0.0:8080`'i dinler — yani LAN'a aciktir.
+Gateway varsayilan olarak `0.0.0.0:7070`'i dinler — yani LAN'a aciktir.
 Ollama ise bilerek **127.0.0.1**'e baglidir: calisanlar auth/audit katmanini
 atlayip dogrudan modele erisemez.
 
@@ -158,14 +182,15 @@ atlayip dogrudan modele erisemez.
 ```bash
 # Linux
 hostname -I                          # orn: 192.168.1.40
-sudo ufw allow 8080/tcp              # gateway (zorunlu)
-sudo ufw allow 3000/tcp 9090/tcp     # Grafana/Prometheus (istege bagli, sadece BT)
+sudo ufw allow 7070/tcp              # gateway (zorunlu)
+sudo ufw allow 3000/tcp 9090/tcp     # Grafana/Prometheus (istege bagli, sadece BT;
+                                     # once .env'de GRAFANA_BIND=0.0.0.0 / PROM_BIND=0.0.0.0 gerekir)
 ```
 
 ```powershell
 # Windows Server
 ipconfig                             # IPv4 adresi
-New-NetFirewallRule -DisplayName "Inference Hub" -Direction Inbound -LocalPort 8080 -Protocol TCP -Action Allow
+New-NetFirewallRule -DisplayName "Inference Hub" -Direction Inbound -LocalPort 7070 -Protocol TCP -Action Allow
 ```
 
 ### 3. Calisanlara hesap acin
@@ -178,7 +203,7 @@ erisecegini ve rate limitini belirler.
 ### 4. Calisanlar baglanir
 
 ```
-http://192.168.1.40:8080        ←  tek ihtiyaclari olan adres
+http://192.168.1.40:7070        ←  tek ihtiyaclari olan adres
 ```
 
 UI'daki Grafana/Prometheus linkleri otomatik olarak ayni sunucu adresine isaret
@@ -207,7 +232,7 @@ eder (localhost'a sabitlenmez).
                                 | JWT (Bearer)
                                 v
 +------------------------------------------------------------+
-|                  FastAPI Gateway :8080                     |
+|                  FastAPI Gateway :7070                     |
 |                                                            |
 |  Auth          : JWT + bcrypt + SQLite (users.db)          |
 |  Router        : departman + regex + prompt-size           |
@@ -242,9 +267,9 @@ Donanima gore otomatik secilir; `.env`'de `CAPACITY_PROFILE` ile manuel override
 | `performance` | %55 CPU / %80 GPU | 6 | 2 | 2 | fallback, text, code, reasoning |
 
 **Otomatik secim:**
-- VRAM ≥ 12 GB veya RAM ≥ 16 GB → `performance` (GPU varsa)
-- 6-16 GB → `balanced`
-- < 6 GB → `lite`
+- GPU varsa: VRAM ≥ 12 GB → `performance`, 6-12 GB → `balanced`, < 6 GB → `lite`
+- CPU-only: < 6 GB RAM → `lite`, aksi halde `balanced` (GPU'suz `performance`
+  yalnizca elle secilebilir — buyuk modeller CPU'da cok yavas kalir)
 
 ---
 
@@ -287,11 +312,11 @@ routing_rules:
 
 **b) API uzerinden:**
 ```bash
-TOKEN=$(curl -s -X POST http://localhost:8080/login \
+TOKEN=$(curl -s -X POST http://localhost:7070/login \
   -H "Content-Type: application/json" \
   -d '{"username":"admin","password":"admin"}' | jq -r .access_token)
 
-curl -X POST http://localhost:8080/api/v1/system/catalog/models \
+curl -X POST http://localhost:7070/api/v1/system/catalog/models \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"model_id":"qwen3-4b","ollama_tag":"qwen3:4b","category":"text","ram_gb":3.0}'
@@ -321,7 +346,7 @@ curl -X POST http://localhost:8080/api/v1/system/catalog/models \
 
 ## API Yuzeyi (ozet)
 
-OpenAPI / Swagger: **http://localhost:8080/docs**
+OpenAPI / Swagger: **http://localhost:7070/docs**
 
 ### Auth & kullanici
 | | |
@@ -344,6 +369,8 @@ OpenAPI / Swagger: **http://localhost:8080/docs**
 | `DELETE /api/v1/system/catalog/models/{id}` | Override sil (admin) |
 | `POST /api/v1/system/catalog/dry-run` | Ekleme oncesi butce/profil raporu |
 | `POST /api/v1/system/pull/{model_id}` | Manuel pull tetikle (admin) |
+| `DELETE /api/v1/system/pull/{model_id}` | Suren indirmeyi iptal et — kalintilar otomatik temizlenir (admin) |
+| `DELETE /api/v1/system/models/{model_id}/pulled` | Modeli Ollama'dan sil, disk bosalt (admin) |
 | `POST /api/v1/system/ollama/inspect` | Ollama'dan boyut tahmin et |
 | `GET  /api/v1/system/ollama/local` | Yerel Ollama modelleri (admin) |
 | `GET  /api/v1/system/discover` | Statik katalogdan onerilen + filtreli modeller |
@@ -385,8 +412,10 @@ OpenAPI / Swagger: **http://localhost:8080/docs**
 ```bash
 make help        # Tum komutlari listele
 make preflight   # Port, daemon, disk kontrolu
-make up          # preflight + build + up
-make up-gpu      # GPU overlay ile
+make up          # preflight + GPU otomatik algilama + build + up (ONERILEN)
+make up-gpu      # NVIDIA overlay'ini zorla
+make up-rocm     # AMD (ROCm) overlay'ini zorla
+make up-cpu      # GPU olsa bile CPU modunda kur
 make down        # Durdur (volume korunur)
 make restart     # Down + up
 make logs        # Canli log akisi
@@ -432,7 +461,7 @@ JWT_SECRET=                             # bos birakilabilir: otomatik uretilir (
 ADMIN_PASSWORD=admin
 
 # Portlar (cakisma varsa degistir)
-GATEWAY_PORT=8080
+GATEWAY_PORT=7070
 OLLAMA_PORT=11434
 PROM_PORT=9090
 GRAFANA_PORT=3000
@@ -528,7 +557,7 @@ DISCOVERY_HF_LIMIT=40                   # HuggingFace'ten cekilecek repo sayisi
 |---|---|
 | Bilgisayar acilista kilitleniyor | `.env`'de `CAPACITY_PROFILE=lite`, `OLLAMA_MEM_LIMIT=3g`, `AUTO_PULL_MODELS=false` |
 | `ollama` saglikli olmuyor | `docker compose logs ollama` — ilk acilis Ollama image (~750 MB) pull eder |
-| `8080 portu kullanimda` | `.env`'de `GATEWAY_PORT=9080` gibi degisik bir port verin, `make up` tekrar |
+| `7070 portu kullanimda` | `.env`'de `GATEWAY_PORT=9080` gibi degisik bir port verin, `make up` tekrar |
 | Gateway 502 donuyor | `/readyz` 503 mu? Model henuz pull edilmemis olabilir, Modeller sayfasindan pull edin |
 | GPU goremiyor | `docker compose -f docker-compose.yml -f docker-compose.gpu.yml up` + NVIDIA Container Toolkit |
 | Oturumlar restart sonrasi dusuyor | `data/` volume'unu silmeyin (otomatik uretilen `jwt_secret` orada) ya da `.env`'de sabit `JWT_SECRET` verin |

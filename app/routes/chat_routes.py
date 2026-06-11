@@ -218,6 +218,21 @@ async def chat_stream(
                     temperature=body.temperature,
                     context_window=state.catalog.get("defaults", {}).get("context_window"),
                 ):
+                    if "_pull_progress" in event:
+                        pp = event["_pull_progress"] or {}
+                        yield _json.dumps({
+                            "event": "status",
+                            "stage": "pull",
+                            "model_id": d.model_id,
+                            "status": pp.get("status"),
+                            "progress": pp.get("pull_progress"),
+                            "stage_text": pp.get("pull_stage"),
+                            "completed_mb": pp.get("pull_completed_mb"),
+                            "total_mb": pp.get("pull_total_mb"),
+                            "speed_mbps": pp.get("pull_speed_mbps"),
+                            "eta_seconds": pp.get("pull_eta_seconds"),
+                        }, ensure_ascii=False) + "\n"
+                        continue
                     if event.get("eval_count"):
                         total_eval = int(event["eval_count"])
                     if event.get("prompt_eval_count"):

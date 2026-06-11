@@ -4,8 +4,9 @@
 SHELL := /usr/bin/env bash
 COMPOSE := docker compose
 COMPOSE_GPU := docker compose -f docker-compose.yml -f docker-compose.gpu.yml
+COMPOSE_ROCM := docker compose -f docker-compose.yml -f docker-compose.rocm.yml
 
-.PHONY: help preflight up up-gpu up-tls down restart logs ps health test test-watch \
+.PHONY: help preflight up up-gpu up-rocm up-cpu up-tls down restart logs ps health test test-watch \
         build pull-base reset clean catalog seed sim grafana-open prom-open \
         backup restore
 
@@ -15,17 +16,23 @@ help:  ## Bu yardim
 preflight:  ## Port, daemon, disk kontrolu yap
 	@bash scripts/preflight.sh
 
-up: preflight  ## Preflight + tum servisleri ayaga kaldir
-	$(COMPOSE) up -d --build gateway ollama prometheus grafana
+up: preflight  ## Preflight + GPU otomatik algilama + tum servisleri ayaga kaldir
+	docker compose $$(bash scripts/detect_gpu.sh) up -d --build
 	@echo ""
 	@echo "Servisler ayaga kalkti. URL'ler:"
-	@echo "  Gateway UI    -> http://localhost:8080"
-	@echo "  API docs      -> http://localhost:8080/docs"
+	@echo "  Gateway UI    -> http://localhost:7070"
+	@echo "  API docs      -> http://localhost:7070/docs"
 	@echo "  Grafana       -> http://localhost:3000  (admin/admin)"
 	@echo "  Prometheus    -> http://localhost:9090"
 
-up-gpu: preflight  ## GPU overlay ile ayaga kaldir
-	$(COMPOSE_GPU) up -d --build gateway ollama prometheus grafana
+up-gpu: preflight  ## NVIDIA GPU overlay'ini zorla
+	$(COMPOSE_GPU) up -d --build
+
+up-rocm: preflight  ## AMD (ROCm) overlay'ini zorla
+	$(COMPOSE_ROCM) up -d --build
+
+up-cpu: preflight  ## GPU olsa bile CPU modunda kur
+	$(COMPOSE) up -d --build
 
 down:  ## Tum servisleri durdur (volume korunur)
 	$(COMPOSE) down --remove-orphans
@@ -45,8 +52,8 @@ ps:  ## Container durumlari
 	$(COMPOSE) ps
 
 health:  ## Tum endpoint saglik kontrolu
-	@echo "Gateway healthz : $$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/healthz)"
-	@echo "Gateway readyz  : $$(curl -s http://localhost:8080/readyz)"
+	@echo "Gateway healthz : $$(curl -s -o /dev/null -w '%{http_code}' http://localhost:7070/healthz)"
+	@echo "Gateway readyz  : $$(curl -s http://localhost:7070/readyz)"
 	@echo "Ollama          : $$(curl -s -o /dev/null -w '%{http_code}' http://localhost:11434/api/tags)"
 	@echo "Prometheus      : $$(curl -s -o /dev/null -w '%{http_code}' http://localhost:9090/-/healthy)"
 	@echo "Grafana         : $$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/api/health)"
@@ -69,8 +76,8 @@ pull-base:  ## Base image'leri onceden cek (python, ollama)
 sim:  ## Yuk simulatorunu calistir (profile=sim)
 	$(COMPOSE) --profile sim up --build simulator
 
-up-tls:  ## HTTPS (Caddy) overlay ile ayaga kaldir — LAN icin onerilir
-	$(COMPOSE) -f docker-compose.yml -f docker-compose.tls.yml up -d --build
+up-tls: preflight  ## HTTPS (Caddy) overlay ile ayaga kaldir — LAN icin onerilir (GPU otomatik algilanir)
+	docker compose $$(bash scripts/detect_gpu.sh) -f docker-compose.tls.yml up -d --build
 
 backup:  ## data/ klasorunu (kullanici DB + audit + config) tarihli arsivle
 	@mkdir -p backups
