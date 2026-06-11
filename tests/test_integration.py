@@ -63,6 +63,25 @@ def test_user_cannot_access_admin_endpoint(client):
     assert r.status_code == 403
 
 
+def test_resources_endpoint_admin_only(client):
+    tok = _token(client, "marketing_user", "mkt123")
+    r = client.get("/api/v1/system/resources", headers={"Authorization": f"Bearer {tok}"})
+    assert r.status_code == 403
+    admin_tok = _token(client, "admin", "admin")
+    r = client.get("/api/v1/system/resources", headers={"Authorization": f"Bearer {admin_tok}"})
+    assert r.status_code == 200
+
+
+def test_catalog_model_rejects_markup_in_tag(client):
+    tok = _token(client, "admin", "admin")
+    r = client.post(
+        "/api/v1/system/catalog/models",
+        headers={"Authorization": f"Bearer {tok}"},
+        json={"model_id": "xss-test", "ollama_tag": "<img src=x onerror=alert(1)>", "category": "text", "ram_gb": 1.0},
+    )
+    assert r.status_code == 422
+
+
 def test_models_endpoint(client):
     tok = _token(client, "marketing_user", "mkt123")
     r = client.get("/api/v1/models", headers={"Authorization": f"Bearer {tok}"})

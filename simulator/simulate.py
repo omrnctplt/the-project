@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 
 import httpx
 
-GATEWAY_URL = os.getenv("GATEWAY_URL", "http://gateway:8080")
+GATEWAY_URL = os.getenv("GATEWAY_URL", "http://gateway:7070")
 SIM_USERS = int(os.getenv("SIM_USERS", "10"))
 SIM_DURATION_SEC = int(os.getenv("SIM_DURATION_SEC", "120"))
 SIM_THINK = float(os.getenv("SIM_THINK_TIME_SEC", "2.0"))

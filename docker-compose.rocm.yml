@@ -1,0 +1,23 @@
+# AMD GPU (ROCm) overlay — `make up` AMD karti algilarsa otomatik kullanilir.
+# Manuel: docker compose -f docker-compose.yml -f docker-compose.rocm.yml up -d --build
+#
+# Gereksinimler (Linux host):
+#   - amdgpu kernel surucusu (cogu dagitimda hazir gelir)
+#   - /dev/kfd ve /dev/dri cihazlari (ls -l /dev/kfd ile kontrol edin)
+# Tuketici (RX 6xxx/7xxx) kartlarda ROCm resmi desteklemiyorsa .env'e
+# HSA_OVERRIDE_GFX_VERSION yazin (orn: RX 6700 XT icin 10.3.0).
+
+services:
+  ollama:
+    image: ollama/ollama:rocm
+    devices:
+      - /dev/kfd
+      - /dev/dri
+    environment:
+      HSA_OVERRIDE_GFX_VERSION: ${HSA_OVERRIDE_GFX_VERSION:-}
+
+  # Gateway VRAM bilgisini amdgpu sysfs'ten okur (hwprobe); dogru kapasite
+  # tier'i ve Kaynaklar sayfasi icin /dev/dri erisimi yeterlidir.
+  gateway:
+    devices:
+      - /dev/dri

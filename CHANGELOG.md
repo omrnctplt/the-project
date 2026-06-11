@@ -2,6 +2,35 @@
 
 Tum dikkat ceken degisiklikler bu dosyada listelenir. Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardina yakindir.
 
+## [0.9.0] - 2026-06-11
+
+Model indirme/yukleme her an gorunur: arayuz hicbir asamada "donmus" gibi durmaz.
+
+### Added
+- **Canli indirme telemetrisi** — orchestrator artik pull sirasinda asama (manifest/katman/dogrulama), inen/toplam bayt, anlik hiz (MB/s) ve tahmini kalan sure (ETA) tutar; `/api/v1/models` bu alanlari dondurur
+- **Modeller sayfasinda canli ilerleme karti** — indirilen modelin kartinda ilerleme cubugu + asama + boyut + hiz + ETA; 1.2 sn'de bir yerinde guncellenir (tam sayfa yenileme yok), bitince/hata olunca toast bildirimi
+- **Sohbette indirme gorunurlugu** — ilk kullanimda model indiriliyorsa yanit balonunda canli ilerleme cubugu gosterilir (streaming'de sunucudan `status` olaylari, one-shot'ta arka plan yoklamasi); model bellege yuklenirken "Model hazirlaniyor…" donen gosterge
+- **Global indirme gostergesi** — hangi sayfada olunursa olunsun suren indirme sag altta canli kartla gorunur; tiklayinca Modeller sayfasina goturur
+- **`queued` model durumu** — indirme sirasi bekleyen model artik "sirada" olarak etiketlenir (eskiden sessizce bekliyordu)
+- **Indirme iptali** — `DELETE /api/v1/system/pull/{id}`: suren veya siradaki indirme guvenle durdurulur (Modeller sayfasinda "Indirmeyi iptal et" butonu); tekrar denenirse Ollama kaldigi yerden devam eder
+- **blob-janitor servisi** — yarim kalan indirmelerin `*-partial` blob kalintilarini `STALE_PARTIAL_MAX_AGE_HOURS` (24 sa) sonra otomatik siler; gateway'e Ollama deposuna yazma yetkisi verilmez (en az yetki + non-root uyumu)
+- **GPU otomatik algilama (NVIDIA + AMD)** — `make up` artik nvidia-smi/Container Toolkit ve `/dev/kfd` kontrolu yapip dogru overlay'i kendisi secer (`scripts/detect_gpu.sh`, `GPU_MODE=auto|nvidia|amd|cpu`); yeni `docker-compose.rocm.yml` AMD overlay'i; `hwprobe` AMD VRAM'i ROCm gerektirmeden amdgpu sysfs'ten okur; Windows icin tek komut kurulum `scripts\up.ps1`
+- **Hata durumunda kurtarma** — model kartinda hata rozeti uzerine gelince sebep gorunur, "Tekrar dene" tek tikla yeniden indirir
+- **`docs/PROJE.md`** — mimari kararlar, teknoloji gerekceleri, tum API endpoint'leri, model yasam dongusu ve DevOps akisini anlatan kapsamli proje dokumani (README'den linkli)
+
+### Changed
+- **Web arayuzu varsayilan portu 8080 → 7070** — gateway, compose, TLS overlay, Caddy, Prometheus, preflight, simulator, Makefile ve dokumantasyon dahil tum katmanlarda guncellendi (`GATEWAY_PORT` ile degistirilebilir)
+- **README kurulum bolumu** — onerilen yol artik `make up` / `scripts\up.ps1` (preflight + GPU algilama + .env uretimi); tek compose komutu alternatif olarak korunur, GPU destegi matrisi eklendi
+- **`make up-rocm` / `make up-cpu`** — overlay'i zorlamak icin yeni hedefler; `make up-tls` artik preflight + GPU algilama da yapar
+- **Replan indirmeleri kesmiyor** — config/katalog degisikligi (replan) suren indirmeleri duzgun durdurup yeni orchestrator'da kaldigi yerden devam ettirir (eskiden indirme sessizce olur, iptal edilemez hale gelirdi); ayrica replan artik `AUTO_PULL_MODELS=false` iken seed model indirmez ("kullanici secmeden indirme yok" sozlesmesi her yolda gecerli)
+- **Grafana varsayilan localhost-only** — Prometheus ile ayni guvenlik durusu; LAN'a acmak icin `GRAFANA_BIND=0.0.0.0`
+
+### Fixed
+- **`/api/v1/system/resources` admin'e kilitlendi** — host process listesi/container istatistikleri artik yalnizca admin'e gorunur (dokumantasyonun vaat ettigi davranis)
+- **Dashboard model tablosunda XSS** — `ollama_tag` escape edilmeden basiliyordu; ayrica `ollama_tag` API seviyesinde karakter desenine baglandi
+- **Sohbet one-shot bekleme gostergesi** — gec gelen yoklama yaniti tamamlanmis cevabin uzerine yazamaz; ilgisiz bir indirme artik "sizin modeliniz" gibi sunulmaz (notr metin)
+- **Modeller sayfasi canli yoklamasi** — durum gecisi sirasindaki tek API hatasi ilerleme guncellemesini kalici durduramaz
+
 ## [0.8.0] - 2026-06-10
 
 Sirket ici (LAN) kurulum paketi: kullanici yonetimi + ag guvenligi sertlestirmesi.

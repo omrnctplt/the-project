@@ -72,7 +72,7 @@ async def replan(request: Request, _=Depends(auth.require_admin)) -> dict[str, A
 
 
 @router.get("/api/v1/system/resources")
-async def system_resources(_=Depends(auth.current_principal)) -> dict[str, Any]:
+async def system_resources(_=Depends(auth.require_admin)) -> dict[str, Any]:
     """Sistem kaynak ozeti — host CPU/mem/disk + top processes + actions."""
     return sysmonitor.snapshot()
 

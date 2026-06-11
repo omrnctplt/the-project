@@ -24,10 +24,10 @@ RUN groupadd -r appuser \
 
 USER appuser
 
-EXPOSE 8080
+EXPOSE 7070
 
 HEALTHCHECK --interval=15s --timeout=5s --start-period=25s --retries=5 \
-    CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8080/healthz', timeout=2).status==200 else 1)"
+    CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:7070/healthz', timeout=2).status==200 else 1)"
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
-CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080", "--workers", "1", "--proxy-headers"]
+CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "7070", "--workers", "1", "--proxy-headers"]

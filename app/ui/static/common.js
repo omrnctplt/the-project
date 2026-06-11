@@ -99,6 +99,45 @@
     if (mb >= 1024) return (mb / 1024).toFixed(1) + " GB";
     return Math.round(mb) + " MB";
   };
+  window.fmtEta = function (sec) {
+    if (sec == null || isNaN(sec)) return "";
+    sec = Math.max(0, Math.round(sec));
+    if (sec < 60) return sec + " sn";
+    const m = Math.floor(sec / 60), r = sec % 60;
+    if (m < 60) return m + " dk" + (r ? " " + r + " sn" : "");
+    return Math.floor(m / 60) + " sa " + (m % 60) + " dk";
+  };
+
+  /* ---------- Model indirme (pull) ilerleme gosterimi ---------- */
+  window.trPullStage = function (stage) {
+    if (!stage) return "Indiriliyor";
+    if (stage === "success") return "Tamamlandi";
+    if (stage === "baslatiliyor") return "Baslatiliyor";
+    if (/sirada/.test(stage)) return "Sirada bekliyor";
+    if (/^pulling manifest/.test(stage)) return "Manifest aliniyor";
+    if (/^pulling /.test(stage)) return "Model dosyasi indiriliyor";
+    if (/verifying/.test(stage)) return "Dosya butunlugu dogrulaniyor";
+    if (/writing manifest/.test(stage)) return "Manifest yaziliyor";
+    if (/removing/.test(stage)) return "Gecici dosyalar temizleniyor";
+    return stage;
+  };
+  window.pullProgressHtml = function (s) {
+    if (s.status === "queued") {
+      return `
+        <div class="pp-head"><span>Sirada bekliyor — baska bir indirme suruyor</span></div>
+        <div class="cbar-track pp-bar"><div class="cbar-fill indeterminate"></div></div>`;
+    }
+    const pct = Math.min(100, Math.round((s.pull_progress || 0) * 100));
+    const haveBytes = (s.pull_total_mb || 0) > 0;
+    const parts = [];
+    if (haveBytes) parts.push(`${fmtBytes(s.pull_completed_mb)} / ${fmtBytes(s.pull_total_mb)}`);
+    if ((s.pull_speed_mbps || 0) > 0.01) parts.push(`${Number(s.pull_speed_mbps).toFixed(1)} MB/s`);
+    if (s.pull_eta_seconds != null && s.pull_eta_seconds > 0) parts.push(`~${fmtEta(s.pull_eta_seconds)} kaldi`);
+    return `
+      <div class="pp-head"><span>${escapeHtml(trPullStage(s.pull_stage))}</span><span>%${pct}</span></div>
+      <div class="cbar-track pp-bar"><div class="cbar-fill pulling" style="width:${pct}%"></div></div>
+      ${parts.length ? `<div class="pp-meta">${escapeHtml(parts.join(" · "))}</div>` : ""}`;
+  };
 
   /* ---------- Key/value table ---------- */
   window.kvRows = function (table, rows) {
@@ -408,6 +447,49 @@
       if (e.target.closest("a.nav-item")) close();
     });
     document.addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
+  })();
+
+  /* ---------- Global model indirme gostergesi ----------
+     Hangi sayfada olursa olsun suren bir model indirmesi varsa sag altta
+     canli ilerleme karti gosterir — kullanici arayuzu donmus sanmaz. */
+  (function globalPullIndicator() {
+    if (isPublic || !token) return;
+    const el = document.createElement("div");
+    el.id = "globalPullBar";
+    el.className = "global-pull hidden";
+    el.setAttribute("role", "status");
+    el.setAttribute("aria-live", "polite");
+    el.title = "Modeller sayfasina git";
+    el.addEventListener("click", () => { location.href = "/ui/models"; });
+    document.body.appendChild(el);
+
+    const IDLE_MS = 8000, ACTIVE_MS = 1500;
+    let timer = null;
+    function schedule(ms) {
+      clearTimeout(timer);
+      timer = setTimeout(tick, ms);
+    }
+    async function tick() {
+      let r;
+      try { r = await api("/api/v1/models"); }
+      catch { schedule(IDLE_MS * 2); return; }
+      const states = r.states || [];
+      const active = states.filter(s => s.status === "pulling" || s.status === "queued");
+      if (!active.length) {
+        el.classList.add("hidden");
+        schedule(IDLE_MS);
+        return;
+      }
+      const s = active.find(x => x.status === "pulling") || active[0];
+      const rest = active.length - 1;
+      el.innerHTML = `
+        <div class="gp-title">Model indiriliyor — arayuzu kullanmaya devam edebilirsiniz</div>
+        <div class="gp-model">${escapeHtml(s.model_id)}${rest > 0 ? ` <span class="gp-more">+${rest} sirada</span>` : ""}</div>
+        ${pullProgressHtml(s)}`;
+      el.classList.remove("hidden");
+      schedule(ACTIVE_MS);
+    }
+    tick();
   })();
 
   /* ---------- Cihaza gore optimizasyon (dusuk guc -> efektleri azalt) ---------- */

@@ -97,7 +97,12 @@ async def replan_state(state: AppState) -> dict[str, Any]:
     make_plan(state)
     if state.sweep_task and not state.sweep_task.done():
         state.sweep_task.cancel()
+    interrupted_pulls: list[str] = []
     if state.orchestrator:
+        try:
+            interrupted_pulls = await state.orchestrator.shutdown_pulls()
+        except Exception as exc:
+            log.warning("Replan: pull gorevleri durdurulamadi: %s", exc)
         try:
             await state.orchestrator.client.aclose()
         except Exception:
@@ -107,6 +112,10 @@ async def replan_state(state: AppState) -> dict[str, Any]:
     state.router = Router(state.catalog, state.orchestrator, state.runtime_config.get("category_assignments"))
     refresh_capacity_metrics(state)
     state.tasks.append(asyncio.create_task(state.orchestrator.pull_initial()))
+    for mid in interrupted_pulls:
+        if state.orchestrator.get_state(mid):
+            log.info("Replan: kesilen indirme devam ettiriliyor: %s", mid)
+            state.tasks.append(state.orchestrator.start_pull(mid))
     state.sweep_task = asyncio.create_task(state.orchestrator.idle_sweep_loop())
     state.tasks.append(state.sweep_task)
     return state.capacity
@@ -218,6 +227,12 @@ async def bootstrap(state: AppState) -> None:
                   else "yerel model yok (kullanici secimi bekleniyor)")
     except Exception as exc:
         bt.finish("local_scan", "warn", f"Ollama'ya ulasilamadi: {exc}")
+
+    try:
+        from . import orchestrator as orch_mod
+        orch_mod.sweep_stale_partials()
+    except Exception as exc:
+        log.warning("Eski partial temizligi atlandi: %s", exc)
 
     state.ready = True
     state.bootstrap.finished_at = time.time()

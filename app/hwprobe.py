@@ -113,6 +113,7 @@ def _detect_gpus_pynvml() -> list[dict[str, Any]] | None:
                 {
                     "index": i,
                     "name": str(name),
+                    "vendor": "nvidia",
                     "vram_total_gb": round(mem.total / 1024**3, 2),
                     "vram_free_gb": round(mem.free / 1024**3, 2),
                     "source": "pynvml",
@@ -153,6 +154,7 @@ def _detect_gpus_smi() -> list[dict[str, Any]] | None:
                 {
                     "index": int(parts[0]),
                     "name": parts[1],
+                    "vendor": "nvidia",
                     "vram_total_gb": round(int(parts[2]) / 1024, 2),
                     "vram_free_gb": round(int(parts[3]) / 1024, 2),
                     "source": "nvidia-smi",
@@ -163,12 +165,64 @@ def _detect_gpus_smi() -> list[dict[str, Any]] | None:
     return gpus or None
 
 
+AMD_VENDOR_ID = "0x1002"
+DRM_ROOT = Path("/sys/class/drm")
+
+
+def _detect_gpus_amd_sysfs(drm_root: Path = DRM_ROOT) -> list[dict[str, Any]] | None:
+    """AMD GPU kesfi — amdgpu surucusunun sysfs arayuzunden (ROCm kurulumu gerekmez).
+
+    /dev/kfd erisimi olmasa bile VRAM toplamini okuyabilir; boylece kapasite
+    plani AMD kartlarda da dogru tier'i secer.
+    """
+    if not drm_root.is_dir():
+        return None
+    gpus: list[dict[str, Any]] = []
+    for card in sorted(drm_root.glob("card[0-9]*")):
+        if "-" in card.name:
+            continue
+        device = card / "device"
+        try:
+            vendor = (device / "vendor").read_text().strip().lower()
+        except OSError:
+            continue
+        if vendor != AMD_VENDOR_ID:
+            continue
+        try:
+            vram_total = int((device / "mem_info_vram_total").read_text().strip())
+        except (OSError, ValueError):
+            continue
+        vram_used = 0
+        try:
+            vram_used = int((device / "mem_info_vram_used").read_text().strip())
+        except (OSError, ValueError):
+            pass
+        name = "AMD GPU"
+        try:
+            name = (device / "product_name").read_text().strip() or name
+        except OSError:
+            pass
+        gpus.append(
+            {
+                "index": len(gpus),
+                "name": name,
+                "vendor": "amd",
+                "vram_total_gb": round(vram_total / 1024**3, 2),
+                "vram_free_gb": round(max(0, vram_total - vram_used) / 1024**3, 2),
+                "source": "amdgpu-sysfs",
+            }
+        )
+    return gpus or None
+
+
 def detect_gpus() -> dict[str, Any]:
-    gpus = _detect_gpus_pynvml() or _detect_gpus_smi()
+    gpus = _detect_gpus_pynvml() or _detect_gpus_smi() or _detect_gpus_amd_sysfs()
     if not gpus:
-        return {"available": False, "devices": [], "vram_total_gb": 0.0, "vram_free_gb": 0.0}
+        return {"available": False, "vendor": None, "devices": [], "vram_total_gb": 0.0, "vram_free_gb": 0.0}
+    vendors = {g.get("vendor", "nvidia") for g in gpus}
     return {
         "available": True,
+        "vendor": vendors.pop() if len(vendors) == 1 else "mixed",
         "devices": gpus,
         "vram_total_gb": round(sum(g["vram_total_gb"] for g in gpus), 2),
         "vram_free_gb": round(sum(g["vram_free_gb"] for g in gpus), 2),

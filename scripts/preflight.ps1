@@ -89,7 +89,7 @@ function Test-Port($label, $port, $envvar) {
         Ok "$label portu $port bos"
     }
 }
-Test-Port "Gateway" (Get-EnvVar GATEWAY_PORT 8080) "GATEWAY_PORT"
+Test-Port "Gateway" (Get-EnvVar GATEWAY_PORT 7070) "GATEWAY_PORT"
 Test-Port "Ollama"  (Get-EnvVar OLLAMA_PORT  11434) "OLLAMA_PORT"
 Test-Port "Prom"    (Get-EnvVar PROM_PORT    9090) "PROM_PORT"
 Test-Port "Grafana" (Get-EnvVar GRAFANA_PORT 3000) "GRAFANA_PORT"
@@ -110,6 +110,22 @@ $ramGB = [int]((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB)
 Ok "Sisteme gorulen RAM: $ramGB GB"
 if ($ramGB -lt 6) {
     Warn "RAM cok dusuk - .env'de CAPACITY_PROFILE=lite ayarlayin"
+}
+
+# 6) GPU
+Hdr "GPU"
+$smi = Get-Command nvidia-smi -ErrorAction SilentlyContinue
+$gpuFound = $false
+if ($smi) {
+    $gpuList = & nvidia-smi -L 2>$null
+    if ($LASTEXITCODE -eq 0 -and $gpuList) {
+        Ok "NVIDIA GPU: $($gpuList | Select-Object -First 1)"
+        Write-Host "    scripts\up.ps1 GPU overlay'ini otomatik ekler (Docker Desktop WSL2 GPU destegi acik olmali)"
+        $gpuFound = $true
+    }
+}
+if (-not $gpuFound) {
+    Ok "NVIDIA GPU bulunamadi - CPU modunda calisacak (AMD ROCm Windows Docker'da desteklenmez)"
 }
 
 Write-Host ""

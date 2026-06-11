@@ -152,7 +152,7 @@
     }
 
     const contentHtml = m.role === "assistant"
-      ? (m.content ? renderMarkdown(m.content) : "")
+      ? (m.content ? renderMarkdown(m.content) : (m.streaming ? genStatusHtml(null) : ""))
       : escapeHtml(m.content || "");
 
     let actions = "";
@@ -304,12 +304,18 @@
 
   async function runOneShot(asst, body_, signal, targetConvId) {
     const token = localStorage.getItem("token");
-    const resp = await fetch("/api/v1/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": token ? `Bearer ${token}` : "" },
-      body: JSON.stringify(body_),
-      signal,
-    });
+    const watcher = startPullWatch(asst, targetConvId);
+    let resp;
+    try {
+      resp = await fetch("/api/v1/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": token ? `Bearer ${token}` : "" },
+        body: JSON.stringify(body_),
+        signal,
+      });
+    } finally {
+      watcher.stop();
+    }
     if (!resp.ok) {
       let detail = `HTTP ${resp.status}`;
       try { const j = await resp.json(); detail = j.detail || detail; } catch {}
@@ -362,6 +368,8 @@
             fallback_triggered: evt.fallback_triggered,
           };
           if (activeId === targetConvId) renderBody();
+        } else if (evt.event === "status") {
+          if (!asst.content) updateGenStatus(evt, targetConvId);
         } else if (evt.event === "token") {
           if (evt.response) {
             asst.content += evt.response;
@@ -380,6 +388,70 @@
       asst.meta.latency_ms = dt;
       asst.meta.eval_count = evalCount;
     }
+  }
+
+  /* ---------- Yanit oncesi durum gosterimi (indirme / bellege yukleme) ----------
+     Ilk token gelene kadar bos balon yerine canli durum gosterilir; boylece
+     model indirilirken ya da bellege yuklenirken arayuz donmus gibi durmaz. */
+  function genStatusHtml(evt) {
+    if (evt && evt.stage === "pull") {
+      const attributed = evt.attributed !== false;
+      const p = {
+        status: evt.status || "pulling",
+        pull_progress: evt.progress,
+        pull_stage: evt.stage_text,
+        pull_completed_mb: evt.completed_mb,
+        pull_total_mb: evt.total_mb,
+        pull_speed_mbps: evt.speed_mbps,
+        pull_eta_seconds: evt.eta_seconds,
+      };
+      if (attributed && p.status !== "queued" && (p.pull_progress || 0) >= 1) {
+        return `<div class="gen-status"><div class="gs-row"><span class="spin" aria-hidden="true"></span><span>Model indirildi — bellege yukleniyor…</span></div></div>`;
+      }
+      const title = !attributed
+        ? `Sunucuda bir model indiriliyor: ${escapeHtml(evt.model_id || "?")} — yanitiniz bunu bekliyor olabilir`
+        : p.status === "queued"
+        ? `${escapeHtml(evt.model_id || "Model")} indirme sirasinda`
+        : `${escapeHtml(evt.model_id || "Model")} ilk kez kullaniliyor — indiriliyor`;
+      return `
+        <div class="gen-status">
+          <div class="gs-row"><span class="spin" aria-hidden="true"></span><span>${title}</span></div>
+          ${pullProgressHtml(p)}
+          ${attributed ? '<div class="gs-note">Tek seferlik indirme; tamamlaninca yanit otomatik baslayacak.</div>' : ""}
+        </div>`;
+    }
+    return `<div class="gen-status"><div class="gs-row"><span class="spin" aria-hidden="true"></span><span>Model hazirlaniyor…</span></div></div>`;
+  }
+
+  function updateGenStatus(evt, targetConvId) {
+    if (targetConvId && activeId !== targetConvId) return;
+    const msgs = body.querySelectorAll(".msg.assistant .content");
+    if (!msgs.length) return;
+    const last = msgs[msgs.length - 1];
+    last.innerHTML = genStatusHtml(evt);
+    const nearBottom = body.scrollHeight - body.scrollTop - body.clientHeight < 90;
+    if (nearBottom) body.scrollTop = body.scrollHeight;
+  }
+
+  function startPullWatch(asst, targetConvId) {
+    let stopped = false;
+    const idle = () => stopped || !!asst.content || !asst.streaming;
+    const timer = setInterval(async () => {
+      if (idle()) return;
+      let r;
+      try { r = await api("/api/v1/models"); } catch { return; }
+      if (idle()) return;
+      const states = r.states || [];
+      const s = states.find(x => x.status === "pulling") || states.find(x => x.status === "queued");
+      if (!s) return;
+      updateGenStatus({
+        stage: "pull", attributed: false, status: s.status, model_id: s.model_id,
+        progress: s.pull_progress, stage_text: s.pull_stage,
+        completed_mb: s.pull_completed_mb, total_mb: s.pull_total_mb,
+        speed_mbps: s.pull_speed_mbps, eta_seconds: s.pull_eta_seconds,
+      }, targetConvId);
+    }, 1500);
+    return { stop: () => { stopped = true; clearInterval(timer); } };
   }
 
   function updateLastContent(text, targetConvId) {

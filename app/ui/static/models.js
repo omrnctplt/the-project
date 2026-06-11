@@ -37,6 +37,7 @@
       states = modelsRes.states || [];
     } catch (e) {
       toast("Yenileme hatasi: " + e.message, "error", 5000);
+      schedulePullPolling();
       return;
     }
     try {
@@ -51,9 +52,54 @@
   }
 
   function schedulePullPolling() {
-    const pulling = states.some(s => s.status === "pulling");
-    if (pulling && !pollTimer) {
-      pollTimer = setTimeout(() => { pollTimer = null; refresh(); }, 4000);
+    const active = states.some(s => s.status === "pulling" || s.status === "queued");
+    if (active && !pollTimer) {
+      pollTimer = setInterval(pollPullProgress, 1200);
+    } else if (!active && pollTimer) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+    }
+  }
+
+  async function pollPullProgress() {
+    let res;
+    try { res = await api("/api/v1/models"); } catch { return; }
+    const fresh = res.states || [];
+    const prev = states;
+    states = fresh;
+    const finished = fresh.filter(s => {
+      const p = prev.find(x => x.model_id === s.model_id);
+      return p && (p.status === "pulling" || p.status === "queued") && s.pulled && s.status !== "pulling";
+    });
+    const failed = fresh.filter(s => {
+      const p = prev.find(x => x.model_id === s.model_id);
+      return p && p.status !== "error" && s.status === "error";
+    });
+    const transition = fresh.some(s => {
+      const p = prev.find(x => x.model_id === s.model_id);
+      return !p || p.status !== s.status || p.pulled !== s.pulled;
+    });
+    if (transition) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+      finished.forEach(s => toast(`${s.model_id} indirildi ve kullanima hazir`, "ok", 4500));
+      failed.forEach(s => toast(`${s.model_id} indirilemedi: ${s.error || "bilinmeyen hata"}`, "error", 6000));
+      try {
+        await refresh();
+        if (remote.length) renderRemote();
+      } finally {
+        schedulePullPolling();
+      }
+      return;
+    }
+    for (const s of fresh) {
+      if (s.status !== "pulling" && s.status !== "queued") continue;
+      const pp = acc.querySelector(`[data-pp="${CSS.escape(s.model_id)}"]`);
+      if (pp) pp.innerHTML = pullProgressHtml(s);
+      const badge = acc.querySelector(`[data-pbadge="${CSS.escape(s.model_id)}"]`);
+      if (badge && s.status === "pulling") {
+        badge.textContent = `indiriliyor %${Math.min(100, Math.round((s.pull_progress || 0) * 100))}`;
+      }
     }
   }
 
@@ -142,6 +188,12 @@
         status: state?.status || "unknown",
         pulled: !!state?.pulled,
         pull_progress: state?.pull_progress || 0,
+        pull_stage: state?.pull_stage,
+        pull_completed_mb: state?.pull_completed_mb,
+        pull_total_mb: state?.pull_total_mb,
+        pull_speed_mbps: state?.pull_speed_mbps,
+        pull_eta_seconds: state?.pull_eta_seconds,
+        error: state?.error,
         inflight: state?.inflight_requests || 0,
         total_req: state?.total_requests || 0,
         avg_ms: state?.avg_latency_ms,
@@ -239,7 +291,11 @@
       : '<span class="badge warn">indirilmemis</span>';
     const stateBadge = it.status && it.status !== "discoverable"
       ? (it.status === "pulling"
-        ? `<span class="badge busy">indiriliyor %${Math.round((it.pull_progress || 0) * 100)}</span>`
+        ? `<span class="badge busy" data-pbadge="${escapeHtml(it.model_id || "")}">indiriliyor %${Math.min(100, Math.round((it.pull_progress || 0) * 100))}</span>`
+        : it.status === "queued"
+        ? `<span class="badge busy">indirme sirasinda</span>`
+        : it.status === "error"
+        ? `<span class="badge error" title="${escapeHtml(it.error || "")}">hata</span>`
         : `<span class="badge ${stateClass(it.status)}">${it.status}</span>`)
       : "";
     const fitsBadge = it.cloud ? ""
@@ -268,8 +324,12 @@
         : `
         <button class="primary" data-action="add-pull" data-tag="${escapeHtml(it.ollama_tag)}" data-cat="${it.category}" data-gb="${it.ram_gb}" data-label="${escapeHtml(it.label)}" ${it.fits ? "" : "disabled title='Ayrilan bellege sigmiyor'"}>+ Kur (ekle & pull)</button>
       `;
+    } else if (it.status === "pulling" || it.status === "queued") {
+      actions = `
+        <span class="muted" style="font-size:0.78rem;">${it.status === "queued" ? "Indirme sirasinda bekliyor…" : "Sayfadan ayrilabilirsiniz, indirme arka planda surer"}</span>
+        <button class="danger small" data-action="cancel-pull" data-mid="${escapeHtml(it.model_id)}">Indirmeyi iptal et</button>`;
     } else if (!it.pulled) {
-      actions = `<button class="primary" data-action="pull" data-mid="${escapeHtml(it.model_id)}" ${it.fits ? "" : "title='Ayrilan bellege sigmiyor'"}>Pull et</button>`;
+      actions = `<button class="primary" data-action="pull" data-mid="${escapeHtml(it.model_id)}" ${it.fits ? "" : "title='Ayrilan bellege sigmiyor'"}>${it.status === "error" ? "Tekrar dene" : "Pull et"}</button>`;
       if (it.overridden) {
         actions += `<button class="danger small" data-action="remove" data-mid="${escapeHtml(it.model_id)}">Katalogdan sil</button>`;
       }
@@ -284,6 +344,9 @@
       : "";
     const cls = `model-card ${it.pulled ? "in-catalog" : ""} ${it.fits ? "fits-current" : ""}`;
     const metaBadges = `${sizeBadge}${paramBadge}${tierBadge}${statusBadge}${stateBadge}${fitsBadge}${hfBadge}${popBadge}`;
+    const pullBlock = (it.status === "pulling" || it.status === "queued") && it.model_id
+      ? `<div class="pull-progress" data-pp="${escapeHtml(it.model_id)}">${pullProgressHtml(it)}</div>`
+      : "";
     const budgetTotal = parseFloat(capacity.budget_total_gb || 0);
     const pct = budgetTotal ? Math.min(100, (parseFloat(it.ram_gb || 0) / budgetTotal) * 100) : 0;
     const usageBar = budgetTotal ? `
@@ -301,6 +364,7 @@
         </div>
         ${it.blurb ? `<div class="blurb">${escapeHtml(it.blurb)}</div>` : ""}
         <div class="meta">${metaBadges}</div>
+        ${pullBlock}
         ${usageBar}
         ${stats}
         <div class="actions">${actions}</div>
@@ -310,7 +374,7 @@
 
   function stateClass(s) {
     if (s === "ready" || s === "loaded") return "ok";
-    if (s === "pulling") return "busy";
+    if (s === "pulling" || s === "queued") return "busy";
     if (s === "error") return "error";
     if (s === "passive") return "plain";
     return "plain";
@@ -347,6 +411,15 @@
       if (act === "pull") {
         await api(`/api/v1/system/pull/${encodeURIComponent(btn.dataset.mid)}`, { method: "POST" });
         toast("Pull baslatildi", "ok");
+      } else if (act === "cancel-pull") {
+        const ok = await confirmModal({
+          title: "Indirmeyi iptal et",
+          body: `<code>${escapeHtml(btn.dataset.mid)}</code> indirmesi durdurulacak. Tekrar denerseniz kaldigi yerden devam eder; kullanilmayan parcalar otomatik temizlenir. Devam edilsin mi?`,
+          primary: "Iptal et",
+        });
+        if (!ok) { btn.disabled = false; btn.textContent = orig; return; }
+        await api(`/api/v1/system/pull/${encodeURIComponent(btn.dataset.mid)}`, { method: "DELETE" });
+        toast("Indirme iptal edildi", "ok", 4000);
       } else if (act === "add-pull") {
         const tag = btn.dataset.tag;
         const mid = tagToModelId(tag);

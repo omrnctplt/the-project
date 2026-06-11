@@ -63,7 +63,7 @@ load_var() {
   echo "${v:-$default}"
 }
 
-GATEWAY_PORT=$(load_var GATEWAY_PORT 8080)
+GATEWAY_PORT=$(load_var GATEWAY_PORT 7070)
 OLLAMA_PORT=$(load_var OLLAMA_PORT 11434)
 PROM_PORT=$(load_var PROM_PORT 9090)
 GRAFANA_PORT=$(load_var GRAFANA_PORT 3000)
@@ -125,6 +125,17 @@ if [ "$RAM_GB" -gt 0 ]; then
   if [ "$RAM_GB" -lt 6 ]; then
     warn "RAM cok dusuk — .env'de CAPACITY_PROFILE=lite ve OLLAMA_MEM_LIMIT=3g onerilir"
   fi
+fi
+
+# 6) GPU
+hdr "GPU"
+if command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi -L >/dev/null 2>&1; then
+  ok "NVIDIA GPU: $(nvidia-smi -L 2>/dev/null | head -1)"
+  echo "    'make up' GPU overlay'ini otomatik ekler (toolkit gerekir)"
+elif [ -e /dev/kfd ] && [ -d /dev/dri ]; then
+  ok "AMD GPU algilandi (/dev/kfd mevcut) — 'make up' ROCm overlay'ini otomatik ekler"
+else
+  ok "GPU bulunamadi — CPU modunda calisacak (sistem profili buna gore secilir)"
 fi
 
 echo

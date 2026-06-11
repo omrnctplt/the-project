@@ -82,15 +82,15 @@
     const tb = document.querySelector("#modelsTable tbody");
     tb.innerHTML = "";
     const sorted = [...(models.states || [])].sort((a, b) => {
-      const rank = (s) => ({ loaded: 0, ready: 1, pulling: 2, unknown: 3, passive: 4, error: 5 }[s.status] ?? 9);
+      const rank = (s) => ({ loaded: 0, ready: 1, pulling: 2, queued: 3, unknown: 4, passive: 5, error: 6 }[s.status] ?? 9);
       return rank(a) - rank(b);
     });
     for (const s of sorted.slice(0, 8)) {
       const tr = document.createElement("tr");
       tr.innerHTML = `
-        <td><strong>${s.model_id}</strong><span class="muted">${s.ollama_tag}</span></td>
-        <td><span class="badge plain">${s.category}</span></td>
-        <td><span class="badge ${badgeClass(s.status)}">${s.status}</span></td>
+        <td><strong>${escapeHtml(s.model_id)}</strong><span class="muted">${escapeHtml(s.ollama_tag)}</span></td>
+        <td><span class="badge plain">${escapeHtml(s.category)}</span></td>
+        <td><span class="badge ${badgeClass(s.status)}">${escapeHtml(s.status)}</span></td>
         <td>${s.inflight_requests}</td>
         <td>${s.total_requests}</td>
         <td>${s.avg_latency_ms ? Math.round(s.avg_latency_ms) + " ms" : "—"}</td>`;
@@ -107,9 +107,9 @@
     if (window.Charts) {
       const counts = {};
       for (const s of (models.states || [])) counts[s.status] = (counts[s.status] || 0) + 1;
-      const order = ["loaded", "ready", "pulling", "passive", "unknown", "error"];
-      const labelTr = { loaded: "Yuklu", ready: "Hazir", pulling: "Iniyor", passive: "Pasif", unknown: "Bilinmiyor", error: "Hata" };
-      const colorOf = { loaded: "var(--ok)", ready: "var(--accent)", pulling: "var(--warn)", passive: "var(--muted-2)", unknown: "var(--surface-3)", error: "var(--danger)" };
+      const order = ["loaded", "ready", "pulling", "queued", "passive", "unknown", "error"];
+      const labelTr = { loaded: "Yuklu", ready: "Hazir", pulling: "Iniyor", queued: "Sirada", passive: "Pasif", unknown: "Bilinmiyor", error: "Hata" };
+      const colorOf = { loaded: "var(--ok)", ready: "var(--accent)", pulling: "var(--warn)", queued: "var(--warn)", passive: "var(--muted-2)", unknown: "var(--surface-3)", error: "var(--danger)" };
       const items = order.filter(k => counts[k]).map(k => ({ label: labelTr[k] || k, value: counts[k], color: colorOf[k] }));
       Charts.bars(document.getElementById("statusBars"), items, { empty: "Henuz model yok" });
     }
@@ -145,7 +145,7 @@
 
   function badgeClass(status) {
     if (status === "loaded" || status === "ready") return "ok";
-    if (status === "pulling") return "busy";
+    if (status === "pulling" || status === "queued") return "busy";
     if (status === "error")   return "error";
     if (status === "passive") return "plain";
     return "plain";
