@@ -2,6 +2,12 @@
 
 Tum dikkat ceken degisiklikler bu dosyada listelenir. Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardina yakindir.
 
+## [0.12.1] - 2026-06-12
+
+### Fixed
+- **Cikis butonu kutu (tofu) gorunuyordu** — ⏻ (U+23FB) glifi Windows sistem fontlarinda yok; cikis, kopyala (⧉), yeniden uret (↻) ve disa aktar (⤓) ikonlari fonta bagimli olmayan inline SVG'lerle degistirildi. Tum arayuz glif envanteri tarandi; kalan semboller (→ ✓ ☰ ▸ vb.) her platformda guvenli
+- Cikis tiklamasi SVG cocuk elemanlarinda da calisir (`closest` ile delege)
+
 ## [0.12.0] - 2026-06-12
 
 Ingilizce dil destegi + GPU'yu sonradan etkinlestirme rehberi.

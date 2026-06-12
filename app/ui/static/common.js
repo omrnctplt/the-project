@@ -22,7 +22,11 @@
           <div class="nm">${escapeHtml(user.label || user.username || t("Kullanici"))}</div>
           <div class="dep">${escapeHtml(user.department || "")} · ${escapeHtml(user.role || "")}</div>
         </div>
-        <button class="logout" id="logoutBtn" title="${t("Cikis")}">⏻</button>`;
+        <button class="logout" id="logoutBtn" title="${t("Cikis")}" aria-label="${t("Cikis")}">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <path d="M12 3v8"/><path d="M6.2 6.8a8 8 0 1 0 11.6 0"/>
+          </svg>
+        </button>`;
     }
     // Admin gizleme + sayfa kapisi
     if (user.role !== "admin") {
@@ -47,7 +51,7 @@
     });
     // Logout binding (delegated) — sohbet gecmisi dahil tum kisisel izler silinir
     document.addEventListener("click", (e) => {
-      if (e.target && e.target.id === "logoutBtn") {
+      if (e.target && e.target.closest && e.target.closest("#logoutBtn")) {
         const toRemove = [];
         for (let i = 0; i < localStorage.length; i++) {
           const k = localStorage.key(i);

@@ -158,8 +158,8 @@
     let actions = "";
     if (m.role === "assistant" && !m.streaming && m.content) {
       actions = `<div class="msg-actions">
-          <button class="msg-act" type="button" data-act="copy" title="${t("Yaniti kopyala")}">⧉ ${t("Kopyala")}</button>
-          ${opts.isLast ? `<button class="msg-act" type="button" data-act="regen" title="${t("Yeniden uret")}">↻ ${t("Yeniden uret")}</button>` : ""}
+          <button class="msg-act" type="button" data-act="copy" title="${t("Yaniti kopyala")}"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> ${t("Kopyala")}</button>
+          ${opts.isLast ? `<button class="msg-act" type="button" data-act="regen" title="${t("Yeniden uret")}"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg> ${t("Yeniden uret")}</button>` : ""}
         </div>`;
     }
 
