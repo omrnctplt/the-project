@@ -275,6 +275,8 @@ a:hover { color: var(--accent); }
   align-items: center;
 }
 .sidebar .user-card button.logout:hover { color: var(--danger); background: var(--danger-soft); }
+.sidebar .user-card button.logout svg { display: block; }
+.msg-act svg { vertical-align: -2px; margin-right: 0.15rem; }
 
 .main-area {
   min-width: 0;
