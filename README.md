@@ -135,8 +135,8 @@ ayarlayin (ornek: RX 6700 XT → `10.3.0`).
 
 | URL | Aciklama |
 |---|---|
-| **http://localhost:9099** | Inference Hub — login → genel bakis |
-| http://localhost:9099/docs | OpenAPI / Swagger |
+| **http://localhost:8888** | Inference Hub — login → genel bakis |
+| http://localhost:8888/docs | OpenAPI / Swagger |
 | http://localhost:3000 | Grafana (`admin/admin`) |
 | http://localhost:9090 | Prometheus (`/alerts` ile alarm durumu) |
 | http://localhost:11434 | Dogrudan Ollama API |
@@ -174,7 +174,7 @@ git clone <repo> && cd the-project
 DEMO_MODE=false ADMIN_PASSWORD='guclu-bir-parola' docker compose up -d --build
 ```
 
-Gateway varsayilan olarak `0.0.0.0:9099`'i dinler — yani LAN'a aciktir.
+Gateway varsayilan olarak `0.0.0.0:8888`'i dinler — yani LAN'a aciktir.
 Ollama ise bilerek **127.0.0.1**'e baglidir: calisanlar auth/audit katmanini
 atlayip dogrudan modele erisemez.
 
@@ -183,7 +183,7 @@ atlayip dogrudan modele erisemez.
 ```bash
 # Linux
 hostname -I                          # orn: 192.168.1.40
-sudo ufw allow 9099/tcp              # gateway (zorunlu)
+sudo ufw allow 8888/tcp              # gateway (zorunlu)
 sudo ufw allow 3000/tcp 9090/tcp     # Grafana/Prometheus (istege bagli, sadece BT;
                                      # once .env'de GRAFANA_BIND=0.0.0.0 / PROM_BIND=0.0.0.0 gerekir)
 ```
@@ -191,7 +191,7 @@ sudo ufw allow 3000/tcp 9090/tcp     # Grafana/Prometheus (istege bagli, sadece 
 ```powershell
 # Windows Server
 ipconfig                             # IPv4 adresi
-New-NetFirewallRule -DisplayName "Inference Hub" -Direction Inbound -LocalPort 9099 -Protocol TCP -Action Allow
+New-NetFirewallRule -DisplayName "Inference Hub" -Direction Inbound -LocalPort 8888 -Protocol TCP -Action Allow
 ```
 
 ### 3. Calisanlara hesap acin
@@ -204,7 +204,7 @@ erisecegini ve rate limitini belirler.
 ### 4. Calisanlar baglanir
 
 ```
-http://192.168.1.40:9099        ←  tek ihtiyaclari olan adres
+http://192.168.1.40:8888        ←  tek ihtiyaclari olan adres
 ```
 
 UI'daki Grafana/Prometheus linkleri otomatik olarak ayni sunucu adresine isaret
@@ -233,7 +233,7 @@ eder (localhost'a sabitlenmez).
                                 | JWT (Bearer)
                                 v
 +------------------------------------------------------------+
-|                  FastAPI Gateway :9099                     |
+|                  FastAPI Gateway :8888                     |
 |                                                            |
 |  Auth          : JWT + bcrypt + SQLite (users.db)          |
 |  Router        : departman + regex + prompt-size           |
@@ -320,11 +320,11 @@ routing_rules:
 
 **b) API uzerinden:**
 ```bash
-TOKEN=$(curl -s -X POST http://localhost:9099/login \
+TOKEN=$(curl -s -X POST http://localhost:8888/login \
   -H "Content-Type: application/json" \
   -d '{"username":"admin","password":"admin"}' | jq -r .access_token)
 
-curl -X POST http://localhost:9099/api/v1/system/catalog/models \
+curl -X POST http://localhost:8888/api/v1/system/catalog/models \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"model_id":"qwen3-4b","ollama_tag":"qwen3:4b","category":"text","ram_gb":3.0}'
@@ -354,7 +354,7 @@ curl -X POST http://localhost:9099/api/v1/system/catalog/models \
 
 ## API Yuzeyi (ozet)
 
-OpenAPI / Swagger: **http://localhost:9099/docs**
+OpenAPI / Swagger: **http://localhost:8888/docs**
 
 ### Auth & kullanici
 | | |
@@ -472,7 +472,7 @@ JWT_SECRET=                             # bos birakilabilir: otomatik uretilir (
 ADMIN_PASSWORD=admin
 
 # Portlar (cakisma varsa degistir)
-GATEWAY_PORT=9099
+GATEWAY_PORT=8888
 OLLAMA_PORT=11434
 PROM_PORT=9090
 GRAFANA_PORT=3000
@@ -568,7 +568,7 @@ DISCOVERY_HF_LIMIT=40                   # HuggingFace'ten cekilecek repo sayisi
 |---|---|
 | Bilgisayar acilista kilitleniyor | `.env`'de `CAPACITY_PROFILE=lite`, `OLLAMA_MEM_LIMIT=3g`, `AUTO_PULL_MODELS=false` |
 | `ollama` saglikli olmuyor | `docker compose logs ollama` — ilk acilis Ollama image (~750 MB) pull eder |
-| `9099 portu kullanimda` | `.env`'de `GATEWAY_PORT=9080` gibi degisik bir port verin, `make up` tekrar |
+| `8888 portu kullanimda` | `.env`'de `GATEWAY_PORT=9080` gibi degisik bir port verin, `make up` tekrar |
 | Gateway 502 donuyor | `/readyz` 503 mu? Model henuz pull edilmemis olabilir, Modeller sayfasindan pull edin |
 | GPU goremiyor | `docker compose -f docker-compose.yml -f docker-compose.gpu.yml up` + NVIDIA Container Toolkit |
 | Oturumlar restart sonrasi dusuyor | `data/` volume'unu silmeyin (otomatik uretilen `jwt_secret` orada) ya da `.env`'de sabit `JWT_SECRET` verin |

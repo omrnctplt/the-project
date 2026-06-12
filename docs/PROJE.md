@@ -116,8 +116,8 @@ on-premise'de sorunsuz calisma.**
 ```
                        ┌─────────────────────────── Docker ag (onprem) ───────────────────────────┐
                        │                                                                           │
- Calisan tarayicisi ──►│  :9099  FastAPI Gateway (512 MB)                                          │
- (LAN: http://ip:9099) │  ┌──────────────────────────────────────────────┐                         │
+ Calisan tarayicisi ──►│  :8888  FastAPI Gateway (512 MB)                                          │
+ (LAN: http://ip:8888) │  ┌──────────────────────────────────────────────┐                         │
                        │  │ auth.py      JWT + bcrypt + login rate limit │   ┌──────────────────┐  │
                        │  │ router.py    departman+prompt → model secimi │──►│ Ollama (6 GB)    │  │
                        │  │ orchestrator model durum makinesi, pull      │   │ :11434 (yalnizca │  │
@@ -393,7 +393,7 @@ gostergesi** (her sayfada).
 
 Detayli envanter: [SECURITY.md](../SECURITY.md). Ozet:
 
-- **Ag yuzeyi:** Yalnizca gateway (9099) LAN'a acilir; Ollama, Prometheus ve
+- **Ag yuzeyi:** Yalnizca gateway (8888) LAN'a acilir; Ollama, Prometheus ve
   Grafana varsayilan olarak 127.0.0.1'e kilitlidir (BT ekibi icin
   `GRAFANA_BIND=0.0.0.0` / `PROM_BIND=0.0.0.0` ile acilabilir). TLS icin Caddy
   overlay (`make up-tls`).

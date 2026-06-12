@@ -20,8 +20,8 @@ up: preflight  ## Preflight + GPU otomatik algilama + tum servisleri ayaga kaldi
 	docker compose $$(bash scripts/detect_gpu.sh) up -d --build
 	@echo ""
 	@echo "Servisler ayaga kalkti. URL'ler:"
-	@echo "  Gateway UI    -> http://localhost:9099"
-	@echo "  API docs      -> http://localhost:9099/docs"
+	@echo "  Gateway UI    -> http://localhost:8888"
+	@echo "  API docs      -> http://localhost:8888/docs"
 	@echo "  Grafana       -> http://localhost:3000  (admin/admin)"
 	@echo "  Prometheus    -> http://localhost:9090"
 
@@ -52,8 +52,8 @@ ps:  ## Container durumlari
 	$(COMPOSE) ps
 
 health:  ## Tum endpoint saglik kontrolu
-	@echo "Gateway healthz : $$(curl -s -o /dev/null -w '%{http_code}' http://localhost:9099/healthz)"
-	@echo "Gateway readyz  : $$(curl -s http://localhost:9099/readyz)"
+	@echo "Gateway healthz : $$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8888/healthz)"
+	@echo "Gateway readyz  : $$(curl -s http://localhost:8888/readyz)"
 	@echo "Ollama          : $$(curl -s -o /dev/null -w '%{http_code}' http://localhost:11434/api/tags)"
 	@echo "Prometheus      : $$(curl -s -o /dev/null -w '%{http_code}' http://localhost:9090/-/healthy)"
 	@echo "Grafana         : $$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/api/health)"

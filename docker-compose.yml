@@ -33,7 +33,7 @@ services:
       - ./data:/data
       - ./config:/etc/onprem-ai:ro
     ports:
-      - "${GATEWAY_PORT:-9099}:7070"
+      - "${GATEWAY_PORT:-8888}:7070"
     depends_on:
       ollama:
         condition: service_healthy
