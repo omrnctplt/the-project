@@ -48,7 +48,7 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host ""
 Write-Host "Servisler ayaga kalkti. URL'ler:" -ForegroundColor Green
-Write-Host "  Gateway UI    -> http://localhost:7070"
-Write-Host "  API docs      -> http://localhost:7070/docs"
+Write-Host "  Gateway UI    -> http://localhost:9099"
+Write-Host "  API docs      -> http://localhost:9099/docs"
 Write-Host "  Grafana       -> http://localhost:3000  (admin/admin)"
 Write-Host "  Prometheus    -> http://localhost:9090"

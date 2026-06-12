@@ -116,8 +116,8 @@ on-premise'de sorunsuz calisma.**
 ```
                        ┌─────────────────────────── Docker ag (onprem) ───────────────────────────┐
                        │                                                                           │
- Calisan tarayicisi ──►│  :7070  FastAPI Gateway (512 MB)                                          │
- (LAN: http://ip:7070) │  ┌──────────────────────────────────────────────┐                         │
+ Calisan tarayicisi ──►│  :9099  FastAPI Gateway (512 MB)                                          │
+ (LAN: http://ip:9099) │  ┌──────────────────────────────────────────────┐                         │
                        │  │ auth.py      JWT + bcrypt + login rate limit │   ┌──────────────────┐  │
                        │  │ router.py    departman+prompt → model secimi │──►│ Ollama (6 GB)    │  │
                        │  │ orchestrator model durum makinesi, pull      │   │ :11434 (yalnizca │  │
@@ -186,6 +186,15 @@ Donanim olcumu bir **kapasite profiline** cevrilir (`CAPACITY_PROFILE=auto` vars
 Otomatik secimde CPU-only makineler RAM ne olursa olsun en fazla `balanced`
 alir; `performance` GPU'suz sistemde yalnizca elle (`CAPACITY_PROFILE=performance`)
 secilebilir — GPU'suz buyuk modellerin gecikmesi kullanici deneyimini bozar.
+
+**Coklu model es zamanliligi:** Ayni anda bellekte tutulabilecek model sayisi
+(`max_loaded_models`) profil tabaniyla sinirli degildir; **butceyle olceklenir**
+(`dynamic_max_loaded`: ~6 GB butce basina +1, tavan 8, profil tabani alt sinir).
+Boylece 48 GB VRAM'li bir sunucuda 6, 80 GB'lik bir H100'de 8 model ayni anda
+sicak durur — farkli departmanlar farkli modelleri es zamanli kullanir. Ollama
+konteyneri de varsayilan `OLLAMA_MAX_LOADED_MODELS=0` (otomatik: GPU basina 3)
+ile calisir; `.env`'den sabitlenebilir. Gateway'in es zamanli istek kapisi
+(`max_concurrent_requests = min(yuklu, aktif) × paralellik`) ayni planla buyur.
 
 Butceye **sigan** modeller "aktif", sigmayanlar "pasif" isaretlenir; UI bunu
 "bellege sigar / sigmaz" rozetiyle gosterir. Model havuzu tier'lidir:
@@ -384,7 +393,7 @@ gostergesi** (her sayfada).
 
 Detayli envanter: [SECURITY.md](../SECURITY.md). Ozet:
 
-- **Ag yuzeyi:** Yalnizca gateway (7070) LAN'a acilir; Ollama, Prometheus ve
+- **Ag yuzeyi:** Yalnizca gateway (9099) LAN'a acilir; Ollama, Prometheus ve
   Grafana varsayilan olarak 127.0.0.1'e kilitlidir (BT ekibi icin
   `GRAFANA_BIND=0.0.0.0` / `PROM_BIND=0.0.0.0` ile acilabilir). TLS icin Caddy
   overlay (`make up-tls`).

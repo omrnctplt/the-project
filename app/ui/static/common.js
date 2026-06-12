@@ -460,7 +460,20 @@
     el.setAttribute("role", "status");
     el.setAttribute("aria-live", "polite");
     el.title = "Modeller sayfasina git";
-    el.addEventListener("click", () => { location.href = "/ui/models"; });
+    el.addEventListener("click", async (e) => {
+      const btn = e.target.closest("button[data-gp-cancel]");
+      if (!btn) { location.href = "/ui/models"; return; }
+      e.stopPropagation();
+      btn.disabled = true;
+      try {
+        await api(`/api/v1/system/pull/${encodeURIComponent(btn.dataset.gpCancel)}`, { method: "DELETE" });
+        toast("Indirme iptal edildi", "ok", 3500);
+        schedule(400);
+      } catch (err) {
+        toast("Iptal edilemedi: " + err.message, "error", 5000);
+        btn.disabled = false;
+      }
+    });
     document.body.appendChild(el);
 
     const IDLE_MS = 8000, ACTIVE_MS = 1500;
@@ -482,10 +495,12 @@
       }
       const s = active.find(x => x.status === "pulling") || active[0];
       const rest = active.length - 1;
+      const canCancel = (user || {}).role === "admin";
       el.innerHTML = `
         <div class="gp-title">Model indiriliyor — arayuzu kullanmaya devam edebilirsiniz</div>
         <div class="gp-model">${escapeHtml(s.model_id)}${rest > 0 ? ` <span class="gp-more">+${rest} sirada</span>` : ""}</div>
-        ${pullProgressHtml(s)}`;
+        ${pullProgressHtml(s)}
+        ${canCancel ? `<div class="gp-actions"><button class="danger small" data-gp-cancel="${escapeHtml(s.model_id)}">Iptal et</button></div>` : ""}`;
       el.classList.remove("hidden");
       schedule(ACTIVE_MS);
     }

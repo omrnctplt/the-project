@@ -94,11 +94,13 @@
     }
     for (const s of fresh) {
       if (s.status !== "pulling" && s.status !== "queued") continue;
-      const pp = acc.querySelector(`[data-pp="${CSS.escape(s.model_id)}"]`);
-      if (pp) pp.innerHTML = pullProgressHtml(s);
-      const badge = acc.querySelector(`[data-pbadge="${CSS.escape(s.model_id)}"]`);
-      if (badge && s.status === "pulling") {
-        badge.textContent = `indiriliyor %${Math.min(100, Math.round((s.pull_progress || 0) * 100))}`;
+      document.querySelectorAll(`[data-pp="${CSS.escape(s.model_id)}"]`).forEach(pp => {
+        pp.innerHTML = pullProgressHtml(s);
+      });
+      if (s.status === "pulling") {
+        document.querySelectorAll(`[data-pbadge="${CSS.escape(s.model_id)}"]`).forEach(badge => {
+          badge.textContent = `indiriliyor %${Math.min(100, Math.round((s.pull_progress || 0) * 100))}`;
+        });
       }
     }
   }
@@ -119,6 +121,8 @@
   function renderRemote() {
     const pulledTags = new Set(states.filter(s => s.pulled).map(s => s.ollama_tag));
     const catalogTags = new Set(Object.values(catalog).map(d => d.ollama_tag));
+    const stateByTag = new Map(states.map(s => [s.ollama_tag, s]));
+    const midByTag = new Map(Object.entries(catalog).map(([mid, d]) => [String(d.ollama_tag), mid]));
     let items = remote.filter(it => {
       if (remoteProv && it.provider !== remoteProv) return false;
       if (remoteFit === "recommended" && !it.recommended) return false;
@@ -139,26 +143,36 @@
       remoteGrid.innerHTML = `<div class="muted" style="padding:0.8rem;">Filtreye uyan model yok.</div>`;
       return;
     }
-    remoteGrid.innerHTML = shown.map(it => renderCard({
-      source: "discover",
-      model_id: null,
-      label: it.label,
-      ollama_tag: it.tag,
-      category: it.category,
-      ram_gb: it.approx_gb,
-      parameters_b: it.parameters_b,
-      tier: it.tier,
-      src: it.provider === "huggingface" ? "huggingface" : null,
-      status: "discoverable",
-      pulled: pulledTags.has(it.tag),
-      in_catalog: catalogTags.has(it.tag),
-      recommended: it.recommended,
-      popularity: it.popularity,
-      cloud: !!it.cloud,
-      inflight: 0, total_req: 0, avg_ms: null,
-      fits: it.fits,
-      blurb: it.blurb,
-    })).join("");
+    remoteGrid.innerHTML = shown.map(it => {
+      const st = stateByTag.get(it.tag);
+      return renderCard({
+        source: "discover",
+        model_id: midByTag.get(it.tag) || null,
+        label: it.label,
+        ollama_tag: it.tag,
+        category: it.category,
+        ram_gb: it.approx_gb,
+        parameters_b: it.parameters_b,
+        tier: it.tier,
+        src: it.provider === "huggingface" ? "huggingface" : null,
+        status: st ? st.status : "discoverable",
+        pulled: st ? !!st.pulled : pulledTags.has(it.tag),
+        pull_progress: st?.pull_progress || 0,
+        pull_stage: st?.pull_stage,
+        pull_completed_mb: st?.pull_completed_mb,
+        pull_total_mb: st?.pull_total_mb,
+        pull_speed_mbps: st?.pull_speed_mbps,
+        pull_eta_seconds: st?.pull_eta_seconds,
+        error: st?.error,
+        in_catalog: catalogTags.has(it.tag),
+        recommended: it.recommended,
+        popularity: it.popularity,
+        cloud: !!it.cloud,
+        inflight: st?.inflight_requests || 0, total_req: 0, avg_ms: null,
+        fits: it.fits,
+        blurb: it.blurb,
+      });
+    }).join("");
     remoteGrid.querySelectorAll("button[data-action]").forEach(b => {
       b.onclick = () => handleAction(b);
     });
@@ -318,26 +332,27 @@
       actions = it.pulled
         ? `<span class="muted" style="font-size:0.78rem;">Sistemde kurulu — sohbette kullanilabilir</span>`
         : `<span class="muted" style="font-size:0.78rem;">Kurulum icin yoneticinize basvurun</span>`;
-    } else if (it.source === "discover") {
-      actions = it.pulled
-        ? `<span class="muted" style="font-size:0.78rem;">Sistemde kurulu</span>`
-        : `
-        <button class="primary" data-action="add-pull" data-tag="${escapeHtml(it.ollama_tag)}" data-cat="${it.category}" data-gb="${it.ram_gb}" data-label="${escapeHtml(it.label)}" ${it.fits ? "" : "disabled title='Ayrilan bellege sigmiyor'"}>+ Kur (ekle & pull)</button>
-      `;
-    } else if (it.status === "pulling" || it.status === "queued") {
+    } else if ((it.status === "pulling" || it.status === "queued") && it.model_id) {
       actions = `
         <span class="muted" style="font-size:0.78rem;">${it.status === "queued" ? "Indirme sirasinda bekliyor…" : "Sayfadan ayrilabilirsiniz, indirme arka planda surer"}</span>
         <button class="danger small" data-action="cancel-pull" data-mid="${escapeHtml(it.model_id)}">Indirmeyi iptal et</button>`;
+    } else if (it.pulled && it.model_id) {
+      actions = `
+        <button data-action="test" data-mid="${escapeHtml(it.model_id)}">Hizli test</button>
+        <button class="danger small" data-action="delete-pulled" data-mid="${escapeHtml(it.model_id)}">Diskten kaldir</button>
+      `;
+      if (it.source !== "discover" && it.overridden) {
+        actions += `<button class="danger small" data-action="remove" data-mid="${escapeHtml(it.model_id)}">Katalogdan sil</button>`;
+      }
+    } else if (it.source === "discover") {
+      actions = `
+        <button class="primary" data-action="add-pull" data-tag="${escapeHtml(it.ollama_tag)}" data-cat="${it.category}" data-gb="${it.ram_gb}" data-label="${escapeHtml(it.label)}" ${it.fits ? "" : "disabled title='Ayrilan bellege sigmiyor'"}>+ Kur (ekle & pull)</button>
+      `;
     } else if (!it.pulled) {
       actions = `<button class="primary" data-action="pull" data-mid="${escapeHtml(it.model_id)}" ${it.fits ? "" : "title='Ayrilan bellege sigmiyor'"}>${it.status === "error" ? "Tekrar dene" : "Pull et"}</button>`;
       if (it.overridden) {
         actions += `<button class="danger small" data-action="remove" data-mid="${escapeHtml(it.model_id)}">Katalogdan sil</button>`;
       }
-    } else {
-      actions = `
-        <button data-action="test" data-mid="${escapeHtml(it.model_id)}">Hizli test</button>
-        <button class="danger small" data-action="delete-pulled" data-mid="${escapeHtml(it.model_id)}">Ollama'dan sil</button>
-      `;
     }
     const stats = it.total_req > 0
       ? `<div class="muted" style="font-size:0.72rem;">${it.total_req} istek · ort ${it.avg_ms ? Math.round(it.avg_ms) : "—"} ms</div>`
