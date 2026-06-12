@@ -2,6 +2,14 @@
 
 Tum dikkat ceken degisiklikler bu dosyada listelenir. Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardina yakindir.
 
+## [0.12.0] - 2026-06-12
+
+Ingilizce dil destegi + GPU'yu sonradan etkinlestirme rehberi.
+
+### Added
+- **Ingilizce arayuz (i18n)** — kenar cubugunda TR/EN dil anahtari; tercih kalici (`hub_lang`). Hafif altyapi: Turkce kaynak metin anahtar, `i18n.js` sozlugu EN'e cevirir (`t()` + `data-i18n`); 430+ ceviri girdisiyle tum sayfalar kapsanir (sohbet, modeller, bellek kokpiti, ayarlar, kaynaklar, kurulum sihirbazi, giris). KVKK aydinlatma metni hukuki dokuman oldugundan Turkce kalir; backend API mesajlari kapsam disidir (dokumante edildi)
+- **README "GPU'yu sonradan etkinlestirme"** — sil-kur gerekmedigi (volume'lar korunur, `make up` yerinde yukseltir), NVIDIA Container Toolkit kurulum komutlari (Linux), Docker Desktop/WSL2 notu (Windows), AMD `/dev/kfd` on kosulu
+
 ## [0.11.0] - 2026-06-12
 
 Coklu model es zamanliligi + tam yonetim ozgurlugu: kesif kartlarindan da iptal/kaldirma.

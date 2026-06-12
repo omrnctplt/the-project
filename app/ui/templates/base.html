@@ -34,21 +34,26 @@
       <div class="user-card" id="userCard"></div>
 
       <div class="nav-section">
-        <div class="title">Calisma alani</div>
-        <a href="/ui/chat"      data-nav="chat"      class="nav-item"><span class="icon">💬</span> Sohbet</a>
-        <a href="/ui/dashboard" data-nav="dashboard" class="nav-item"><span class="icon">📊</span> Genel bakis</a>
-        <a href="/ui/models"    data-nav="models"    class="nav-item"><span class="icon">🧩</span> Modeller</a>
+        <div class="title" data-i18n>Calisma alani</div>
+        <a href="/ui/chat"      data-nav="chat"      class="nav-item"><span class="icon">💬</span> <span data-i18n>Sohbet</span></a>
+        <a href="/ui/dashboard" data-nav="dashboard" class="nav-item"><span class="icon">📊</span> <span data-i18n>Genel bakis</span></a>
+        <a href="/ui/models"    data-nav="models"    class="nav-item"><span class="icon">🧩</span> <span data-i18n>Modeller</span></a>
       </div>
 
       <div class="nav-section" data-admin-only>
-        <div class="title">Yonetim</div>
-        <a href="/ui/admin"     data-nav="admin"     class="nav-item"><span class="icon">⚙</span> Ayarlar</a>
-        <a href="/ui/resources" data-nav="resources" class="nav-item"><span class="icon">📈</span> Kaynaklar</a>
+        <div class="title" data-i18n>Yonetim</div>
+        <a href="/ui/admin"     data-nav="admin"     class="nav-item"><span class="icon">⚙</span> <span data-i18n>Ayarlar</span></a>
+        <a href="/ui/resources" data-nav="resources" class="nav-item"><span class="icon">📈</span> <span data-i18n>Kaynaklar</span></a>
       </div>
 
       <div class="spacer"></div>
 
-      <button class="theme-toggle" id="themeToggle" type="button" aria-label="Tema degistir" title="Tema degistir">
+      <button class="theme-toggle" id="langToggle" type="button" aria-label="Dil degistir / Change language" title="Dil degistir / Change language">
+        <span class="ico" aria-hidden="true">🌐</span>
+        <span class="lbl">Dil: TR</span>
+      </button>
+
+      <button class="theme-toggle" id="themeToggle" type="button" aria-label="Tema degistir" title="Tema degistir" data-i18n-attrs="aria-label,title">
         <span class="ico" aria-hidden="true"></span>
         <span class="lbl">Tema</span>
       </button>
@@ -76,6 +81,7 @@
   <div class="nav-backdrop" id="navBackdrop"></div>
   <div id="toast-area"></div>
 
+  <script src="/static/i18n.js?v={{ app_version }}"></script>
   <script src="/static/bootstrap.js?v={{ app_version }}"></script>
   <script src="/static/common.js?v={{ app_version }}"></script>
   {% block scripts %}{% endblock %}

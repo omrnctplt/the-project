@@ -36,7 +36,7 @@
       const modelsRes = await api("/api/v1/models");
       states = modelsRes.states || [];
     } catch (e) {
-      toast("Yenileme hatasi: " + e.message, "error", 5000);
+      toast(t("Yenileme hatasi: {m}", { m: e.message }), "error", 5000);
       schedulePullPolling();
       return;
     }
@@ -82,8 +82,8 @@
     if (transition) {
       clearInterval(pollTimer);
       pollTimer = null;
-      finished.forEach(s => toast(`${s.model_id} indirildi ve kullanima hazir`, "ok", 4500));
-      failed.forEach(s => toast(`${s.model_id} indirilemedi: ${s.error || "bilinmeyen hata"}`, "error", 6000));
+      finished.forEach(s => toast(t("{m} indirildi ve kullanima hazir", { m: s.model_id }), "ok", 4500));
+      failed.forEach(s => toast(t("{m} indirilemedi: {e}", { m: s.model_id, e: s.error || t("bilinmeyen hata") }), "error", 6000));
       try {
         await refresh();
         if (remote.length) renderRemote();
@@ -99,14 +99,14 @@
       });
       if (s.status === "pulling") {
         document.querySelectorAll(`[data-pbadge="${CSS.escape(s.model_id)}"]`).forEach(badge => {
-          badge.textContent = `indiriliyor %${Math.min(100, Math.round((s.pull_progress || 0) * 100))}`;
+          badge.textContent = t("indiriliyor %{p}", { p: Math.min(100, Math.round((s.pull_progress || 0) * 100)) });
         });
       }
     }
   }
 
   async function refreshRemote(force) {
-    remoteGrid.innerHTML = `<div class="muted" style="padding:0.8rem;">Guncel model listesi yukleniyor...</div>`;
+    remoteGrid.innerHTML = `<div class="muted" style="padding:0.8rem;">${t("Guncel model listesi yukleniyor...")}</div>`;
     try {
       const r = await api("/api/v1/system/discover/remote?limit=1000" + (force ? "&refresh=true" : ""));
       remote = r.models || [];
@@ -114,7 +114,7 @@
       renderRemote();
     } catch (e) {
       remote = [];
-      remoteGrid.innerHTML = `<div class="muted" style="padding:0.8rem;">Canli kesif su an kullanilamiyor (internet erisimi gerekli): ${escapeHtml(e.message)}</div>`;
+      remoteGrid.innerHTML = `<div class="muted" style="padding:0.8rem;">${t("Canli kesif su an kullanilamiyor (internet erisimi gerekli): {m}", { m: escapeHtml(e.message) })}</div>`;
     }
   }
 
@@ -136,11 +136,12 @@
       const age = remoteMeta.age_minutes != null ? Math.round(remoteMeta.age_minutes) : "?";
       const src = remoteMeta.sources || {};
       remoteMetaEl.textContent =
-        `${remoteMeta.total} model bulundu (ollama.com: ${src.ollama || 0}, HuggingFace: ${src.huggingface || 0}) · ` +
-        `liste ${age} dk once guncellendi${remoteMeta.stale ? " · ESKI KOPYA (ag erisimi yok)" : ""}`;
+        t("{n} model bulundu (ollama.com: {o}, HuggingFace: {h})", { n: remoteMeta.total, o: src.ollama || 0, h: src.huggingface || 0 }) + " · " +
+        t("liste {age} dk once guncellendi", { age }) +
+        (remoteMeta.stale ? " · " + t("ESKI KOPYA (ag erisimi yok)") : "");
     }
     if (!shown.length) {
-      remoteGrid.innerHTML = `<div class="muted" style="padding:0.8rem;">Filtreye uyan model yok.</div>`;
+      remoteGrid.innerHTML = `<div class="muted" style="padding:0.8rem;">${t("Filtreye uyan model yok.")}</div>`;
       return;
     }
     remoteGrid.innerHTML = shown.map(it => {
@@ -255,11 +256,11 @@
     }
 
     const labels = {
-      text: "Metin / sozel",
-      code: "Kod / programlama",
-      reasoning: "Reasoning / mantik",
-      persona: "Persona / rol yapma",
-      fallback: "Fallback (hafif yedek)"
+      text: t("Metin / sozel"),
+      code: t("Kod / programlama"),
+      reasoning: t("Reasoning / mantik"),
+      persona: t("Persona / rol yapma"),
+      fallback: t("Fallback (hafif yedek)")
     };
     const order = ["fallback", "text", "code", "reasoning", "persona"];
 
@@ -275,7 +276,7 @@
       section.className = "accordion-section " + open;
       section.innerHTML = `
         <div class="head">
-          <div class="name">${labels[c]} <span class="count">${items.length} model</span></div>
+          <div class="name">${labels[c]} <span class="count">${t("{n} model", { n: items.length })}</span></div>
           <div class="chev">▸</div>
         </div>
         <div class="body">
@@ -287,7 +288,7 @@
     }
 
     if (total === 0) {
-      acc.innerHTML = `<div class="card" style="text-align:center; padding:2rem; color:var(--muted);">Eslesme yok.</div>`;
+      acc.innerHTML = `<div class="card" style="text-align:center; padding:2rem; color:var(--muted);">${t("Eslesme yok.")}</div>`;
     }
 
     bindCardActions();
@@ -297,65 +298,65 @@
   function renderCard(it) {
     const statusBadge = it.source === "discover"
       ? (it.cloud ? '<span class="badge busy">☁ cloud</span>'
-        : it.pulled ? '<span class="badge ok">indirilmis</span>'
-        : it.in_catalog ? '<span class="badge plain">katalogda</span>'
-        : it.recommended ? '<span class="badge ok">donanima onerilen</span>'
-        : '<span class="badge">kesfedildi</span>')
-      : it.pulled ? '<span class="badge ok">indirilmis</span>'
-      : '<span class="badge warn">indirilmemis</span>';
+        : it.pulled ? `<span class="badge ok">${t("indirilmis")}</span>`
+        : it.in_catalog ? `<span class="badge plain">${t("katalogda")}</span>`
+        : it.recommended ? `<span class="badge ok">${t("donanima onerilen")}</span>`
+        : `<span class="badge">${t("kesfedildi")}</span>`)
+      : it.pulled ? `<span class="badge ok">${t("indirilmis")}</span>`
+      : `<span class="badge warn">${t("indirilmemis")}</span>`;
     const stateBadge = it.status && it.status !== "discoverable"
       ? (it.status === "pulling"
-        ? `<span class="badge busy" data-pbadge="${escapeHtml(it.model_id || "")}">indiriliyor %${Math.min(100, Math.round((it.pull_progress || 0) * 100))}</span>`
+        ? `<span class="badge busy" data-pbadge="${escapeHtml(it.model_id || "")}">${t("indiriliyor %{p}", { p: Math.min(100, Math.round((it.pull_progress || 0) * 100)) })}</span>`
         : it.status === "queued"
-        ? `<span class="badge busy">indirme sirasinda</span>`
+        ? `<span class="badge busy">${t("indirme sirasinda")}</span>`
         : it.status === "error"
-        ? `<span class="badge error" title="${escapeHtml(it.error || "")}">hata</span>`
+        ? `<span class="badge error" title="${escapeHtml(it.error || "")}">${t("hata")}</span>`
         : `<span class="badge ${stateClass(it.status)}">${it.status}</span>`)
       : "";
     const fitsBadge = it.cloud ? ""
       : it.fits
-      ? '<span class="badge ok">bellege sigar</span>'
-      : '<span class="badge warn">bellek yetersiz</span>';
+      ? `<span class="badge ok">${t("bellege sigar")}</span>`
+      : `<span class="badge warn">${t("bellek yetersiz")}</span>`;
     const sizeBadge = it.cloud
-      ? '<span class="badge plain">boyut: bulut</span>'
+      ? `<span class="badge plain">${t("boyut: bulut")}</span>`
       : `<span class="badge plain">${it.ram_gb || "?"} GB</span>`;
     const paramBadge = it.parameters_b ? `<span class="badge plain">${it.parameters_b}B param</span>` : "";
     const tierBadge = it.tier ? `<span class="badge plain">${escapeHtml(it.tier)}</span>` : "";
     const hfBadge = it.src === "huggingface" ? '<span class="badge busy">HF</span>' : "";
     const popBadge = it.popularity
-      ? `<span class="badge plain">${typeof fmtNumber === "function" ? fmtNumber(it.popularity) : it.popularity} indirme</span>` : "";
+      ? `<span class="badge plain">${t("{n} indirme", { n: typeof fmtNumber === "function" ? fmtNumber(it.popularity) : it.popularity })}</span>` : "";
 
     let actions = "";
     if (it.cloud) {
-      actions = `<span class="muted" style="font-size:0.78rem;">Yalnizca Ollama Cloud'da calisir — on-premise kurulamaz (veri disari cikar)</span>`;
+      actions = `<span class="muted" style="font-size:0.78rem;">${t("Yalnizca Ollama Cloud'da calisir — on-premise kurulamaz (veri disari cikar)")}</span>`;
     } else if (!isAdmin) {
       actions = it.pulled
-        ? `<span class="muted" style="font-size:0.78rem;">Sistemde kurulu — sohbette kullanilabilir</span>`
-        : `<span class="muted" style="font-size:0.78rem;">Kurulum icin yoneticinize basvurun</span>`;
+        ? `<span class="muted" style="font-size:0.78rem;">${t("Sistemde kurulu — sohbette kullanilabilir")}</span>`
+        : `<span class="muted" style="font-size:0.78rem;">${t("Kurulum icin yoneticinize basvurun")}</span>`;
     } else if ((it.status === "pulling" || it.status === "queued") && it.model_id) {
       actions = `
-        <span class="muted" style="font-size:0.78rem;">${it.status === "queued" ? "Indirme sirasinda bekliyor…" : "Sayfadan ayrilabilirsiniz, indirme arka planda surer"}</span>
-        <button class="danger small" data-action="cancel-pull" data-mid="${escapeHtml(it.model_id)}">Indirmeyi iptal et</button>`;
+        <span class="muted" style="font-size:0.78rem;">${it.status === "queued" ? t("Indirme sirasinda bekliyor…") : t("Sayfadan ayrilabilirsiniz, indirme arka planda surer")}</span>
+        <button class="danger small" data-action="cancel-pull" data-mid="${escapeHtml(it.model_id)}">${t("Indirmeyi iptal et")}</button>`;
     } else if (it.pulled && it.model_id) {
       actions = `
-        <button data-action="test" data-mid="${escapeHtml(it.model_id)}">Hizli test</button>
-        <button class="danger small" data-action="delete-pulled" data-mid="${escapeHtml(it.model_id)}">Diskten kaldir</button>
+        <button data-action="test" data-mid="${escapeHtml(it.model_id)}">${t("Hizli test")}</button>
+        <button class="danger small" data-action="delete-pulled" data-mid="${escapeHtml(it.model_id)}">${t("Diskten kaldir")}</button>
       `;
       if (it.source !== "discover" && it.overridden) {
-        actions += `<button class="danger small" data-action="remove" data-mid="${escapeHtml(it.model_id)}">Katalogdan sil</button>`;
+        actions += `<button class="danger small" data-action="remove" data-mid="${escapeHtml(it.model_id)}">${t("Katalogdan sil")}</button>`;
       }
     } else if (it.source === "discover") {
       actions = `
-        <button class="primary" data-action="add-pull" data-tag="${escapeHtml(it.ollama_tag)}" data-cat="${it.category}" data-gb="${it.ram_gb}" data-label="${escapeHtml(it.label)}" ${it.fits ? "" : "disabled title='Ayrilan bellege sigmiyor'"}>+ Kur (ekle & pull)</button>
+        <button class="primary" data-action="add-pull" data-tag="${escapeHtml(it.ollama_tag)}" data-cat="${it.category}" data-gb="${it.ram_gb}" data-label="${escapeHtml(it.label)}" ${it.fits ? "" : `disabled title='${t("Ayrilan bellege sigmiyor")}'`}>${t("+ Kur (ekle & pull)")}</button>
       `;
     } else if (!it.pulled) {
-      actions = `<button class="primary" data-action="pull" data-mid="${escapeHtml(it.model_id)}" ${it.fits ? "" : "title='Ayrilan bellege sigmiyor'"}>${it.status === "error" ? "Tekrar dene" : "Pull et"}</button>`;
+      actions = `<button class="primary" data-action="pull" data-mid="${escapeHtml(it.model_id)}" ${it.fits ? "" : `title='${t("Ayrilan bellege sigmiyor")}'`}>${it.status === "error" ? t("Tekrar dene") : t("Pull et")}</button>`;
       if (it.overridden) {
-        actions += `<button class="danger small" data-action="remove" data-mid="${escapeHtml(it.model_id)}">Katalogdan sil</button>`;
+        actions += `<button class="danger small" data-action="remove" data-mid="${escapeHtml(it.model_id)}">${t("Katalogdan sil")}</button>`;
       }
     }
     const stats = it.total_req > 0
-      ? `<div class="muted" style="font-size:0.72rem;">${it.total_req} istek · ort ${it.avg_ms ? Math.round(it.avg_ms) : "—"} ms</div>`
+      ? `<div class="muted" style="font-size:0.72rem;">${t("{n} istek · ort {ms} ms", { n: it.total_req, ms: it.avg_ms ? Math.round(it.avg_ms) : "—" })}</div>`
       : "";
     const cls = `model-card ${it.pulled ? "in-catalog" : ""} ${it.fits ? "fits-current" : ""}`;
     const metaBadges = `${sizeBadge}${paramBadge}${tierBadge}${statusBadge}${stateBadge}${fitsBadge}${hfBadge}${popBadge}`;
@@ -366,7 +367,7 @@
     const pct = budgetTotal ? Math.min(100, (parseFloat(it.ram_gb || 0) / budgetTotal) * 100) : 0;
     const usageBar = budgetTotal ? `
       <div style="margin-top:0.45rem;">
-        <div class="muted" style="font-size:0.7rem; display:flex; justify-content:space-between;"><span>Bellek payi</span><span>${pct.toFixed(0)}%</span></div>
+        <div class="muted" style="font-size:0.7rem; display:flex; justify-content:space-between;"><span>${t("Bellek payi")}</span><span>${pct.toFixed(0)}%</span></div>
         <div class="cbar-track" style="margin-top:0.2rem;"><div class="cbar-fill" style="width:${pct}%; background:${it.fits ? "var(--accent)" : "var(--warn)"};"></div></div>
       </div>` : "";
     return `
@@ -425,16 +426,16 @@
     try {
       if (act === "pull") {
         await api(`/api/v1/system/pull/${encodeURIComponent(btn.dataset.mid)}`, { method: "POST" });
-        toast("Pull baslatildi", "ok");
+        toast(t("Pull baslatildi"), "ok");
       } else if (act === "cancel-pull") {
         const ok = await confirmModal({
-          title: "Indirmeyi iptal et",
-          body: `<code>${escapeHtml(btn.dataset.mid)}</code> indirmesi durdurulacak. Tekrar denerseniz kaldigi yerden devam eder; kullanilmayan parcalar otomatik temizlenir. Devam edilsin mi?`,
-          primary: "Iptal et",
+          title: t("Indirmeyi iptal et"),
+          body: t("{m} indirmesi durdurulacak. Tekrar denerseniz kaldigi yerden devam eder; kullanilmayan parcalar otomatik temizlenir. Devam edilsin mi?", { m: `<code>${escapeHtml(btn.dataset.mid)}</code>` }),
+          primary: t("Iptal et"),
         });
         if (!ok) { btn.disabled = false; btn.textContent = orig; return; }
         await api(`/api/v1/system/pull/${encodeURIComponent(btn.dataset.mid)}`, { method: "DELETE" });
-        toast("Indirme iptal edildi", "ok", 4000);
+        toast(t("Indirme iptal edildi"), "ok", 4000);
       } else if (act === "add-pull") {
         const tag = btn.dataset.tag;
         const mid = tagToModelId(tag);
@@ -451,35 +452,35 @@
           if (!/zaten|already|exist/i.test(e.message || "")) throw e;
         }
         await api(`/api/v1/system/pull/${encodeURIComponent(mid)}`, { method: "POST" });
-        toast("Kurulum baslatildi: katalog + indirme", "ok");
+        toast(t("Kurulum baslatildi: katalog + indirme"), "ok");
       } else if (act === "remove") {
         const ok = await confirmModal({
-          title: "Katalogdan sil",
-          body: `<code>${escapeHtml(btn.dataset.mid)}</code> katalog kaydi silinecek. Devam edilsin mi?`,
-          primary: "Sil",
+          title: t("Katalogdan sil"),
+          body: t("{m} katalog kaydi silinecek. Devam edilsin mi?", { m: `<code>${escapeHtml(btn.dataset.mid)}</code>` }),
+          primary: t("Sil"),
         });
         if (!ok) { btn.disabled = false; btn.textContent = orig; return; }
         await api(`/api/v1/system/catalog/models/${encodeURIComponent(btn.dataset.mid)}`, { method: "DELETE" });
-        toast("Silindi", "ok");
+        toast(t("Silindi"), "ok");
       } else if (act === "test") {
         const r = await api("/api/v1/chat", {
           method: "POST",
-          body: JSON.stringify({ prompt: "Merhaba, tek cumlede kendini tanit.", model_id: btn.dataset.mid }),
+          body: JSON.stringify({ prompt: t("Merhaba, tek cumlede kendini tanit."), model_id: btn.dataset.mid }),
         });
         toast(`Test OK · ${Math.round(r.latency_ms)} ms · ${r.eval_count} tok`, "ok", 4500);
       } else if (act === "delete-pulled") {
         const ok = await confirmModal({
-          title: "Modeli diskten sil",
-          body: `<code>${escapeHtml(btn.dataset.mid)}</code> Ollama'dan silinecek; disk bosalir, gerektiginde tekrar indirilebilir.`,
-          primary: "Sil",
+          title: t("Modeli diskten sil"),
+          body: t("{m} Ollama'dan silinecek; disk bosalir, gerektiginde tekrar indirilebilir.", { m: `<code>${escapeHtml(btn.dataset.mid)}</code>` }),
+          primary: t("Sil"),
         });
         if (!ok) { btn.disabled = false; btn.textContent = orig; return; }
         await api(`/api/v1/system/models/${encodeURIComponent(btn.dataset.mid)}/pulled`, { method: "DELETE" });
-        toast("Model Ollama'dan silindi", "ok");
+        toast(t("Model Ollama'dan silindi"), "ok");
       }
       setTimeout(async () => { await refresh(); renderRemote(); }, 500);
     } catch (err) {
-      toast("Hata: " + err.message, "error", 5000);
+      toast(t("Hata: {m}", { m: err.message }), "error", 5000);
       btn.disabled = false; btn.textContent = orig;
     }
   }
@@ -533,39 +534,39 @@
 
   function openCustomModal() {
     modal({
-      title: "Ozel model ekle",
+      title: t("Ozel model ekle"),
       body: `
-        <p class="muted" style="margin-top:0;">Ollama Library veya HuggingFace'ten model ekleyin. HuggingFace icin tag'i <code>hf.co/kullanici/depo-GGUF</code> formatinda girin — sistem otomatik HF olarak isaretler. Boyut icin <strong>Inspect</strong> (once pull gerekli) ya da manuel girin.</p>
-        <label>Ollama / HuggingFace tag <input id="cm_tag" placeholder="orn: qwen3:8b  veya  hf.co/bartowski/Qwen3-8B-GGUF" /></label>
-        <label>Kategori <select id="cm_cat">
-          <option value="text">Metin</option>
-          <option value="code">Kod</option>
+        <p class="muted" style="margin-top:0;">${t("Ollama Library veya HuggingFace'ten model ekleyin. HuggingFace icin tag'i {code} formatinda girin — sistem otomatik HF olarak isaretler. Boyut icin {inspect} (once pull gerekli) ya da manuel girin.", { code: "<code>hf.co/kullanici/depo-GGUF</code>", inspect: "<strong>Inspect</strong>" })}</p>
+        <label>Ollama / HuggingFace tag <input id="cm_tag" placeholder="${t("orn: qwen3:8b  veya  hf.co/bartowski/Qwen3-8B-GGUF")}" /></label>
+        <label>${t("Kategori")} <select id="cm_cat">
+          <option value="text">${t("Metin")}</option>
+          <option value="code">${t("Kod")}</option>
           <option value="reasoning">Reasoning</option>
           <option value="persona">Persona</option>
           <option value="fallback">Fallback</option>
         </select></label>
         <label>RAM/VRAM (GB) <input id="cm_ram" type="number" step="0.1" min="0.1" placeholder="3.0" /></label>
         <div style="display:flex; gap:0.5rem;">
-          <button id="cm_inspect" type="button">Boyutu tahmin et</button>
-          <button id="cm_dryrun" type="button">Bellege sigar mi?</button>
+          <button id="cm_inspect" type="button">${t("Boyutu tahmin et")}</button>
+          <button id="cm_dryrun" type="button">${t("Bellege sigar mi?")}</button>
         </div>
       `,
-      primary: "Ekle",
+      primary: t("Ekle"),
       onPrimary: async () => {
         const tag = document.getElementById("cm_tag").value.trim();
         const cat = document.getElementById("cm_cat").value;
         const ram = parseFloat(document.getElementById("cm_ram").value);
-        if (!tag || isNaN(ram)) { toast("Tag ve RAM zorunlu", "warn"); return false; }
+        if (!tag || isNaN(ram)) { toast(t("Tag ve RAM zorunlu"), "warn"); return false; }
         const mid = tagToModelId(tag);
         try {
           await api("/api/v1/system/catalog/models", {
             method: "POST",
             body: JSON.stringify({ model_id: mid, ollama_tag: tag, category: cat, ram_gb: ram, vram_gb: ram }),
           });
-          toast("Eklendi", "ok");
+          toast(t("Eklendi"), "ok");
           refresh();
         } catch (e) {
-          toast("Eklenemedi: " + e.message, "error", 5000);
+          toast(t("Eklenemedi: {m}", { m: e.message }), "error", 5000);
           return false;
         }
       },
@@ -574,7 +575,7 @@
     setTimeout(() => {
       document.getElementById("cm_inspect")?.addEventListener("click", async () => {
         const tag = document.getElementById("cm_tag").value.trim();
-        if (!tag) { toast("Tag girin", "warn"); return; }
+        if (!tag) { toast(t("Tag girin"), "warn"); return; }
         try {
           const r = await api("/api/v1/system/ollama/inspect", { method: "POST", body: JSON.stringify({ ollama_tag: tag }) });
           if (r.estimated_ram_gb) document.getElementById("cm_ram").value = r.estimated_ram_gb;
@@ -585,7 +586,7 @@
         const tag = document.getElementById("cm_tag").value.trim();
         const cat = document.getElementById("cm_cat").value;
         const ram = parseFloat(document.getElementById("cm_ram").value);
-        if (!tag || isNaN(ram)) { toast("Tag ve RAM zorunlu", "warn"); return; }
+        if (!tag || isNaN(ram)) { toast(t("Tag ve RAM zorunlu"), "warn"); return; }
         const mid = tagToModelId(tag);
         try {
           const r = await api("/api/v1/system/catalog/dry-run", {
@@ -594,14 +595,14 @@
           });
           const rows = Object.entries(r.profiles).map(([n, p]) => `
             <tr><td>${escapeHtml(n)}</td><td>${p.budget_total_gb} GB</td>
-            <td>${p.fits ? '<span class="badge ok">sigar</span>' : '<span class="badge warn">sigmaz</span>'}</td></tr>`).join("");
+            <td>${p.fits ? `<span class="badge ok">${t("sigar")}</span>` : `<span class="badge warn">${t("sigmaz")}</span>`}</td></tr>`).join("");
           modal({
-            title: "Bellek raporu",
+            title: t("Bellek raporu"),
             body: `
               <p style="margin-top:0;"><strong>${escapeHtml(r.verdict)}</strong></p>
               <p class="muted">${escapeHtml(r.advice)}</p>
-              <table class="kv"><tr><th>Profil</th><th>Ayrilan bellek</th><th>Durum</th></tr>${rows}</table>`,
-            primary: "Tamam",
+              <table class="kv"><tr><th>${t("Profil")}</th><th>${t("Ayrilan bellek")}</th><th>${t("Durum")}</th></tr>${rows}</table>`,
+            primary: t("Tamam"),
           });
         } catch (e) { toast("Dry-run: " + e.message, "error", 5000); }
       });

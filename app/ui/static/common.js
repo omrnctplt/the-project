@@ -19,10 +19,10 @@
       uc.innerHTML = `
         <div class="avatar">${escapeHtml(initials)}</div>
         <div class="who">
-          <div class="nm">${escapeHtml(user.label || user.username || "Kullanici")}</div>
+          <div class="nm">${escapeHtml(user.label || user.username || t("Kullanici"))}</div>
           <div class="dep">${escapeHtml(user.department || "")} · ${escapeHtml(user.role || "")}</div>
         </div>
-        <button class="logout" id="logoutBtn" title="Cikis">⏻</button>`;
+        <button class="logout" id="logoutBtn" title="${t("Cikis")}">⏻</button>`;
     }
     // Admin gizleme + sayfa kapisi
     if (user.role !== "admin") {
@@ -75,7 +75,7 @@
       localStorage.removeItem("token");
       localStorage.removeItem("user");
       location.href = "/ui/login";
-      throw new Error("Oturum suresi doldu, yeniden giris yapin");
+      throw new Error(t("Oturum suresi doldu, yeniden giris yapin"));
     }
     if (!r.ok) {
       let detail = `${r.status} ${r.statusText}`;
@@ -102,29 +102,29 @@
   window.fmtEta = function (sec) {
     if (sec == null || isNaN(sec)) return "";
     sec = Math.max(0, Math.round(sec));
-    if (sec < 60) return sec + " sn";
+    if (sec < 60) return t("{s} sn", { s: sec });
     const m = Math.floor(sec / 60), r = sec % 60;
-    if (m < 60) return m + " dk" + (r ? " " + r + " sn" : "");
-    return Math.floor(m / 60) + " sa " + (m % 60) + " dk";
+    if (m < 60) return r ? t("{m} dk {s} sn", { m: m, s: r }) : t("{m} dk", { m: m });
+    return t("{h} sa {m} dk", { h: Math.floor(m / 60), m: m % 60 });
   };
 
   /* ---------- Model indirme (pull) ilerleme gosterimi ---------- */
   window.trPullStage = function (stage) {
-    if (!stage) return "Indiriliyor";
-    if (stage === "success") return "Tamamlandi";
-    if (stage === "baslatiliyor") return "Baslatiliyor";
-    if (/sirada/.test(stage)) return "Sirada bekliyor";
-    if (/^pulling manifest/.test(stage)) return "Manifest aliniyor";
-    if (/^pulling /.test(stage)) return "Model dosyasi indiriliyor";
-    if (/verifying/.test(stage)) return "Dosya butunlugu dogrulaniyor";
-    if (/writing manifest/.test(stage)) return "Manifest yaziliyor";
-    if (/removing/.test(stage)) return "Gecici dosyalar temizleniyor";
+    if (!stage) return t("Indiriliyor");
+    if (stage === "success") return t("Tamamlandi");
+    if (stage === "baslatiliyor") return t("Baslatiliyor");
+    if (/sirada/.test(stage)) return t("Sirada bekliyor");
+    if (/^pulling manifest/.test(stage)) return t("Manifest aliniyor");
+    if (/^pulling /.test(stage)) return t("Model dosyasi indiriliyor");
+    if (/verifying/.test(stage)) return t("Dosya butunlugu dogrulaniyor");
+    if (/writing manifest/.test(stage)) return t("Manifest yaziliyor");
+    if (/removing/.test(stage)) return t("Gecici dosyalar temizleniyor");
     return stage;
   };
   window.pullProgressHtml = function (s) {
     if (s.status === "queued") {
       return `
-        <div class="pp-head"><span>Sirada bekliyor — baska bir indirme suruyor</span></div>
+        <div class="pp-head"><span>${t("Sirada bekliyor — baska bir indirme suruyor")}</span></div>
         <div class="cbar-track pp-bar"><div class="cbar-fill indeterminate"></div></div>`;
     }
     const pct = Math.min(100, Math.round((s.pull_progress || 0) * 100));
@@ -132,7 +132,7 @@
     const parts = [];
     if (haveBytes) parts.push(`${fmtBytes(s.pull_completed_mb)} / ${fmtBytes(s.pull_total_mb)}`);
     if ((s.pull_speed_mbps || 0) > 0.01) parts.push(`${Number(s.pull_speed_mbps).toFixed(1)} MB/s`);
-    if (s.pull_eta_seconds != null && s.pull_eta_seconds > 0) parts.push(`~${fmtEta(s.pull_eta_seconds)} kaldi`);
+    if (s.pull_eta_seconds != null && s.pull_eta_seconds > 0) parts.push(t("~{eta} kaldi", { eta: fmtEta(s.pull_eta_seconds) }));
     return `
       <div class="pp-head"><span>${escapeHtml(trPullStage(s.pull_stage))}</span><span>%${pct}</span></div>
       <div class="cbar-track pp-bar"><div class="cbar-fill pulling" style="width:${pct}%"></div></div>
@@ -170,7 +170,7 @@
   /* ---------- Modal ----------
      onPrimary false dondururse (veya Promise'i false'a cozulurse) modal ACIK
      kalir — dogrulama hatasinda kullanicinin girdigi veri kaybolmaz. */
-  window.modal = function ({ title, body, primary, onPrimary, cancel = "Vazgec", danger = false }) {
+  window.modal = function ({ title, body, primary, onPrimary, cancel = t("Vazgec"), danger = false }) {
     const back = document.createElement("div");
     back.className = "modal-backdrop";
     const titleId = "modal-title-" + Math.random().toString(36).slice(2, 8);
@@ -226,7 +226,7 @@
   };
 
   /* ---------- Onay diyalogu (native confirm yerine) ---------- */
-  window.confirmModal = function ({ title, body, primary = "Evet", danger = true }) {
+  window.confirmModal = function ({ title, body, primary = t("Evet"), danger = true }) {
     return new Promise((resolve) => {
       const m = window.modal({
         title,
@@ -344,11 +344,11 @@
     html = html.replace(/ B(\d+) /g, (_m, i) => {
       const b = blocks[+i];
       if (!b) return "";
-      const langLabel = b.lang ? `<span class="code-lang">${esc(b.lang)}</span>` : `<span class="code-lang">metin</span>`;
+      const langLabel = b.lang ? `<span class="code-lang">${esc(b.lang)}</span>` : `<span class="code-lang">${t("metin")}</span>`;
       return (
         `<div class="code-block" data-code="${esc(b.code)}">` +
         `<div class="code-head">${langLabel}` +
-        `<button class="copy-code" type="button" aria-label="Kodu kopyala">Kopyala</button></div>` +
+        `<button class="copy-code" type="button" aria-label="${t("Kodu kopyala")}">${t("Kopyala")}</button></div>` +
         `<pre><code>${esc(b.code)}</code></pre></div>`
       );
     });
@@ -364,7 +364,7 @@
     const code = block ? block.getAttribute("data-code") : "";
     const ok = await window.copyToClipboard(code || "");
     const prev = btn.textContent;
-    btn.textContent = ok ? "Kopyalandi ✓" : "Hata";
+    btn.textContent = ok ? t("Kopyalandi ✓") : t("Hata");
     btn.classList.toggle("copied", ok);
     setTimeout(() => { btn.textContent = prev; btn.classList.remove("copied"); }, 1500);
   });
@@ -374,7 +374,7 @@
     const root = document.documentElement;
     const order = ["auto", "light", "dark"];
     const icons = { auto: "🌗", light: "☀", dark: "☾" };
-    const labels = { auto: "Sistem", light: "Acik", dark: "Koyu" };
+    const labels = { auto: t("Sistem"), light: t("Acik"), dark: t("Koyu") };
     const media = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
 
     function resolve(pref) {
@@ -388,8 +388,8 @@
       const ico = btn.querySelector(".ico");
       const lbl = btn.querySelector(".lbl");
       if (ico) ico.textContent = icons[pref];
-      if (lbl) lbl.textContent = "Tema: " + labels[pref];
-      btn.setAttribute("title", "Tema: " + labels[pref] + " — degistirmek icin tikla");
+      if (lbl) lbl.textContent = t("Tema: {m}", { m: labels[pref] });
+      btn.setAttribute("title", t("Tema: {m} — degistirmek icin tikla", { m: labels[pref] }));
     }
     function apply(pref) {
       const mode = resolve(pref);
@@ -459,7 +459,7 @@
     el.className = "global-pull hidden";
     el.setAttribute("role", "status");
     el.setAttribute("aria-live", "polite");
-    el.title = "Modeller sayfasina git";
+    el.title = t("Modeller sayfasina git");
     el.addEventListener("click", async (e) => {
       const btn = e.target.closest("button[data-gp-cancel]");
       if (!btn) { location.href = "/ui/models"; return; }
@@ -467,10 +467,10 @@
       btn.disabled = true;
       try {
         await api(`/api/v1/system/pull/${encodeURIComponent(btn.dataset.gpCancel)}`, { method: "DELETE" });
-        toast("Indirme iptal edildi", "ok", 3500);
+        toast(t("Indirme iptal edildi"), "ok", 3500);
         schedule(400);
       } catch (err) {
-        toast("Iptal edilemedi: " + err.message, "error", 5000);
+        toast(t("Iptal edilemedi: {m}", { m: err.message }), "error", 5000);
         btn.disabled = false;
       }
     });
@@ -497,10 +497,10 @@
       const rest = active.length - 1;
       const canCancel = (user || {}).role === "admin";
       el.innerHTML = `
-        <div class="gp-title">Model indiriliyor — arayuzu kullanmaya devam edebilirsiniz</div>
-        <div class="gp-model">${escapeHtml(s.model_id)}${rest > 0 ? ` <span class="gp-more">+${rest} sirada</span>` : ""}</div>
+        <div class="gp-title">${t("Model indiriliyor — arayuzu kullanmaya devam edebilirsiniz")}</div>
+        <div class="gp-model">${escapeHtml(s.model_id)}${rest > 0 ? ` <span class="gp-more">${t("+{n} sirada", { n: rest })}</span>` : ""}</div>
         ${pullProgressHtml(s)}
-        ${canCancel ? `<div class="gp-actions"><button class="danger small" data-gp-cancel="${escapeHtml(s.model_id)}">Iptal et</button></div>` : ""}`;
+        ${canCancel ? `<div class="gp-actions"><button class="danger small" data-gp-cancel="${escapeHtml(s.model_id)}">${t("Iptal et")}</button></div>` : ""}`;
       el.classList.remove("hidden");
       schedule(ACTIVE_MS);
     }

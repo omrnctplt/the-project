@@ -3,54 +3,54 @@
 {% block content %}
 <div class="page-header">
   <div>
-    <h1>Modeller</h1>
-    <div class="subtitle">Aktif, indirilmis ve onerilen modeller — arama + kategoriye gore.</div>
+    <h1 data-i18n>Modeller</h1>
+    <div class="subtitle" data-i18n>Aktif, indirilmis ve onerilen modeller — arama + kategoriye gore.</div>
   </div>
   <div class="actions">
-    <button id="refreshBtn" class="ghost">Yenile</button>
-    <button id="addCustomBtn" class="primary" data-admin-only>Yeni model ekle</button>
+    <button id="refreshBtn" class="ghost" data-i18n>Yenile</button>
+    <button id="addCustomBtn" class="primary" data-admin-only data-i18n>Yeni model ekle</button>
   </div>
 </div>
 
 <section class="card" style="margin-bottom:1rem;">
   <div class="search-box">
-    <input type="search" id="searchInput" placeholder="Model adi veya tag ara... (orn: qwen, deepseek, gemma)" />
+    <input type="search" id="searchInput" placeholder="Model adi veya tag ara... (orn: qwen, deepseek, gemma)" data-i18n-attrs="placeholder" />
   </div>
   <div class="filter-row" id="catFilter">
-    <button data-cat="" class="active">Hepsi</button>
-    <button data-cat="text">Metin</button>
-    <button data-cat="code">Kod</button>
+    <button data-cat="" class="active" data-i18n>Hepsi</button>
+    <button data-cat="text" data-i18n>Metin</button>
+    <button data-cat="code" data-i18n>Kod</button>
     <button data-cat="reasoning">Reasoning</button>
     <button data-cat="persona">Persona</button>
     <button data-cat="fallback">Fallback</button>
   </div>
   <div class="filter-row" id="statusFilter">
-    <button data-st="" class="active">Tum durumlar</button>
-    <button data-st="pulled">Indirilmis</button>
-    <button data-st="fits">Bellege sigan</button>
-    <button data-st="not-pulled">Indirilmemis</button>
+    <button data-st="" class="active" data-i18n>Tum durumlar</button>
+    <button data-st="pulled" data-i18n>Indirilmis</button>
+    <button data-st="fits" data-i18n>Bellege sigan</button>
+    <button data-st="not-pulled" data-i18n>Indirilmemis</button>
   </div>
 </section>
 
 <section class="card" style="margin-bottom:1rem;" id="remoteSection">
   <div class="page-header" style="margin-bottom:0.5rem;">
     <div>
-      <h2 style="margin:0;">Canli kesif — guncel modeller</h2>
-      <div class="subtitle" id="remoteMeta">ollama.com + HuggingFace'ten otomatik cekilir; yeni model ciktiginda guncelleme gerekmez.</div>
+      <h2 style="margin:0;" data-i18n>Canli kesif — guncel modeller</h2>
+      <div class="subtitle" id="remoteMeta" data-i18n>ollama.com + HuggingFace'ten otomatik cekilir; yeni model ciktiginda guncelleme gerekmez.</div>
     </div>
     <div class="actions">
-      <button id="remoteRefreshBtn" class="ghost" data-admin-only>Listeyi guncelle</button>
+      <button id="remoteRefreshBtn" class="ghost" data-admin-only data-i18n>Listeyi guncelle</button>
     </div>
   </div>
   <div class="filter-row" id="remoteProviderFilter">
-    <button data-prov="" class="active">Tum kaynaklar</button>
+    <button data-prov="" class="active" data-i18n>Tum kaynaklar</button>
     <button data-prov="ollama">Ollama Library</button>
     <button data-prov="huggingface">HuggingFace GGUF</button>
   </div>
   <div class="filter-row" id="remoteFitFilter">
-    <button data-fit="" class="active">Hepsi</button>
-    <button data-fit="recommended">Donanima onerilen</button>
-    <button data-fit="fits">Bellege sigan</button>
+    <button data-fit="" class="active" data-i18n>Hepsi</button>
+    <button data-fit="recommended" data-i18n>Donanima onerilen</button>
+    <button data-fit="fits" data-i18n>Bellege sigan</button>
   </div>
   <div id="remoteGrid" class="model-grid" style="margin-top:0.6rem;"></div>
 </section>

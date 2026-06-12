@@ -3,28 +3,28 @@
 {% block content %}
 <div class="page-header">
   <div>
-    <h1>Genel Bakis</h1>
-    <div class="subtitle">Donanim, kapasite plani, model durumu ve sizin kullaniminiz.</div>
+    <h1 data-i18n>Genel Bakis</h1>
+    <div class="subtitle" data-i18n>Donanim, kapasite plani, model durumu ve sizin kullaniminiz.</div>
   </div>
   <div class="actions">
-    <span id="readyBadge" class="badge">baglaniliyor</span>
-    <a href="/ui/resources" class="muted" data-admin-only>Detayli kaynak →</a>
+    <span id="readyBadge" class="badge" data-i18n>baglaniliyor</span>
+    <a href="/ui/resources" class="muted" data-admin-only data-i18n>Detayli kaynak →</a>
   </div>
 </div>
 
 <section class="grid four">
   <div class="stat" id="statProfile">
-    <div class="stat-label">Aktif profil</div>
+    <div class="stat-label" data-i18n>Aktif profil</div>
     <div class="stat-value" id="vProfile">—</div>
     <div class="stat-sub" id="vProfileSub">—</div>
   </div>
   <div class="stat" id="statBudget">
-    <div class="stat-label">Bellek butcesi</div>
+    <div class="stat-label" data-i18n>Bellek butcesi</div>
     <div class="stat-value" id="vBudget">—</div>
     <div class="stat-sub" id="vBudgetSub">—</div>
   </div>
   <div class="stat" id="statModels">
-    <div class="stat-label">Aktif modeller</div>
+    <div class="stat-label" data-i18n>Aktif modeller</div>
     <div class="stat-value" id="vModels">—</div>
     <div class="stat-sub" id="vModelsSub">—</div>
   </div>
@@ -37,11 +37,11 @@
 
 <section class="card mem-card" style="margin-top:1rem;" id="memoryCard">
   <div class="mem-head">
-    <h2 style="margin:0;">Bellek kokpiti</h2>
-    <span class="muted" id="memSummary" style="font-size:0.8rem;">yukleniyor…</span>
+    <h2 style="margin:0;" data-i18n>Bellek kokpiti</h2>
+    <span class="muted" id="memSummary" style="font-size:0.8rem;" data-i18n>yukleniyor…</span>
   </div>
   <div class="mem-bar-wrap" id="memBarWrap">
-    <div class="mem-bar" id="memBar" role="img" aria-label="Bellek kullanim cubugu"></div>
+    <div class="mem-bar" id="memBar" role="img" aria-label="Bellek kullanim cubugu" data-i18n-attrs="aria-label"></div>
     <div class="mem-legend" id="memLegend"></div>
   </div>
   <div class="mem-groups" id="memGroups"></div>
@@ -49,16 +49,16 @@
 
 <section class="grid three" style="margin-top:1rem;">
   <div class="card chart-card">
-    <h3>Bellek butcesi</h3>
+    <h3 data-i18n>Bellek butcesi</h3>
     <div id="budgetDonut" class="donut-wrap"></div>
     <div class="muted" id="budgetNote" style="text-align:center; font-size:0.78rem;"></div>
   </div>
   <div class="card chart-card">
-    <h3>Model durumu dagilimi</h3>
+    <h3 data-i18n>Model durumu dagilimi</h3>
     <div id="statusBars"></div>
   </div>
   <div class="card chart-card">
-    <h3>Kullaniminiz (model bazinda)</h3>
+    <h3 data-i18n>Kullaniminiz (model bazinda)</h3>
     <div id="usageBars"></div>
   </div>
 </section>
@@ -66,23 +66,23 @@
 <section class="card" style="margin-top:1rem;">
   <div class="grid two">
     <div>
-      <h3>Donanim</h3>
+      <h3 data-i18n>Donanim</h3>
       <table id="hwTable" class="kv"></table>
     </div>
     <div>
-      <h3>Kapasite plani</h3>
+      <h3 data-i18n>Kapasite plani</h3>
       <table id="capTable" class="kv"></table>
     </div>
   </div>
 </section>
 
 <section class="card">
-  <h2>Modeller <a href="/ui/models" class="muted" style="font-size:0.78rem; font-weight:normal;">tumune git →</a></h2>
+  <h2><span data-i18n>Modeller</span> <a href="/ui/models" class="muted" style="font-size:0.78rem; font-weight:normal;" data-i18n>tumune git →</a></h2>
   <table id="modelsTable" class="data">
     <thead>
       <tr>
-        <th>Model</th><th>Kategori</th><th>Durum</th>
-        <th>Inflight</th><th>Toplam istek</th><th>Ort. gecikme</th>
+        <th>Model</th><th data-i18n>Kategori</th><th data-i18n>Durum</th>
+        <th>Inflight</th><th data-i18n>Toplam istek</th><th data-i18n>Ort. gecikme</th>
       </tr>
     </thead>
     <tbody></tbody>
@@ -90,16 +90,16 @@
 </section>
 
 <section class="card">
-  <h2>Kullaniminiz</h2>
+  <h2 data-i18n>Kullaniminiz</h2>
   <div class="grid two">
     <div>
-      <h3>Ozet</h3>
+      <h3 data-i18n>Ozet</h3>
       <table id="usageTable" class="kv"></table>
     </div>
     <div>
-      <h3>Model dagilimi</h3>
+      <h3 data-i18n>Model dagilimi</h3>
       <table id="usageByModel" class="data">
-        <thead><tr><th>Model</th><th style="text-align:right;">Istek</th></tr></thead>
+        <thead><tr><th>Model</th><th style="text-align:right;" data-i18n>Istek</th></tr></thead>
         <tbody></tbody>
       </table>
     </div>

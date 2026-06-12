@@ -2,10 +2,10 @@
   const badge = document.getElementById("readyBadge");
   try {
     const ready = await fetch("/readyz").then(r => r.json());
-    badge.textContent = ready.ready ? "hazir" : "hazirlaniyor";
+    badge.textContent = ready.ready ? t("hazir") : t("hazirlaniyor");
     badge.className = "badge " + (ready.ready ? "ok" : "warn");
   } catch {
-    badge.textContent = "baglanti hatasi";
+    badge.textContent = t("baglanti hatasi");
     badge.className = "badge error";
   }
 
@@ -17,37 +17,37 @@
 
     document.getElementById("vProfile").textContent = (cap.profile || "?").toUpperCase();
     document.getElementById("vProfileSub").textContent = cap.profile_label
-      ? (cap.profile_auto ? "otomatik" : "manuel") + " secildi"
+      ? (cap.profile_auto ? t("otomatik secildi") : t("manuel secildi"))
       : "—";
 
     document.getElementById("vBudget").textContent =
       `${fmtNumber(cap.budget_used_gb, 1)} / ${fmtNumber(cap.budget_total_gb, 1)} GB`;
-    document.getElementById("vBudgetSub").textContent = (cap.accelerator || "?").toUpperCase() + " uzerinde";
+    document.getElementById("vBudgetSub").textContent = t("{a} uzerinde", { a: (cap.accelerator || "?").toUpperCase() });
     const usedPct = cap.budget_total_gb ? cap.budget_used_gb / cap.budget_total_gb : 0;
     document.getElementById("statBudget").className = "stat " + (usedPct > 0.9 ? "error" : usedPct > 0.7 ? "warn" : "ok");
 
     document.getElementById("vModels").textContent =
       `${(cap.active_models || []).length}/${(cap.active_models || []).length + (cap.passive_models || []).length}`;
-    document.getElementById("vModelsSub").textContent = `${cap.max_concurrent_requests || 1} es zamanli`;
+    document.getElementById("vModelsSub").textContent = t("{n} es zamanli", { n: cap.max_concurrent_requests || 1 });
 
     kvRows(document.getElementById("hwTable"), [
       ["Platform", `${hw.platform?.system || "?"} ${hw.platform?.release || ""}`],
-      ["CPU", `${hw.cpu?.physical_cores || "?"} fiziksel · ${hw.cpu?.logical_cores || "?"} mantiksal`],
+      ["CPU", t("{p} fiziksel · {l} mantiksal", { p: hw.cpu?.physical_cores || "?", l: hw.cpu?.logical_cores || "?" })],
       ["RAM (effective)", `${fmtNumber(hw.memory?.effective_total_gb, 2)} GB`],
-      ["GPU", hw.gpu?.available ? `${hw.gpu.devices.length}× ${hw.gpu.devices.map(g => g.name).join(", ")}` : "yok"],
+      ["GPU", hw.gpu?.available ? `${hw.gpu.devices.length}× ${hw.gpu.devices.map(g => g.name).join(", ")}` : t("yok")],
       ["VRAM", hw.gpu?.available ? `${fmtNumber(hw.gpu.vram_total_gb, 2)} GB` : "—"],
-      ["Disk bos", `${fmtNumber(hw.disk?.free_gb, 1)} GB`],
+      [t("Disk bos"), `${fmtNumber(hw.disk?.free_gb, 1)} GB`],
     ]);
 
     kvRows(document.getElementById("capTable"), [
-      ["Profil", `${cap.profile_label || cap.profile || "?"}`],
-      ["Donanim sinifi", (cap.hardware_tier || "?").toUpperCase()],
-      ["Hizlandirici", (cap.accelerator || "?").toUpperCase()],
-      ["Bellek butcesi kullanimi", `${fmtNumber(cap.budget_used_gb, 2)} / ${fmtNumber(cap.budget_total_gb, 2)} GB`],
-      ["Max yuklu model", cap.max_loaded_models || 1],
-      ["Es zamanli istek", cap.max_concurrent_requests || 1],
-      ["Beklenen kullanici", cap.expected_users || "—"],
-      ["Uyarilar", (cap.warnings || []).length ? (cap.warnings || []).join(" · ") : "—"],
+      [t("Profil"), `${cap.profile_label || cap.profile || "?"}`],
+      [t("Donanim sinifi"), (cap.hardware_tier || "?").toUpperCase()],
+      [t("Hizlandirici"), (cap.accelerator || "?").toUpperCase()],
+      [t("Bellek butcesi kullanimi"), `${fmtNumber(cap.budget_used_gb, 2)} / ${fmtNumber(cap.budget_total_gb, 2)} GB`],
+      [t("Max yuklu model"), cap.max_loaded_models || 1],
+      [t("Es zamanli istek"), cap.max_concurrent_requests || 1],
+      [t("Beklenen kullanici"), cap.expected_users || "—"],
+      [t("Uyarilar"), (cap.warnings || []).length ? (cap.warnings || []).join(" · ") : "—"],
     ]);
 
     if (window.Charts) {
@@ -56,12 +56,12 @@
         cap.budget_used_gb || 0, cap.budget_total_gb || 0,
         {
           sub: `${fmtNumber(cap.budget_used_gb, 1)}/${fmtNumber(cap.budget_total_gb, 1)} GB`,
-          aria: "Bellek butce kullanim orani",
+          aria: t("Bellek butce kullanim orani"),
         }
       );
       const note = document.getElementById("budgetNote");
       if (note) note.textContent =
-        `${(cap.accelerator || "?").toUpperCase()} · bos ${fmtNumber(cap.budget_free_gb, 1)} GB`;
+        t("{a} · bos {g} GB", { a: (cap.accelerator || "?").toUpperCase(), g: fmtNumber(cap.budget_free_gb, 1) });
     }
   } catch (e) { console.error(e); }
 
@@ -70,7 +70,7 @@
     const res = await api("/api/v1/system/resources");
     if (res?.host) {
       document.getElementById("vCpuHome").textContent = `${fmtNumber(res.host.cpu_percent, 1)} %`;
-      document.getElementById("vCpuHomeSub").textContent = `${res.host.cpu_count} cekirdek · bellek ${fmtNumber(res.host.memory_percent, 0)}%`;
+      document.getElementById("vCpuHomeSub").textContent = t("{n} cekirdek · bellek {m}%", { n: res.host.cpu_count, m: fmtNumber(res.host.memory_percent, 0) });
       const p = res.host.cpu_percent || 0;
       document.getElementById("statCpu").className = "stat " + (p > 80 ? "error" : p > 60 ? "warn" : "ok");
     }
@@ -97,10 +97,10 @@
       tb.appendChild(tr);
     }
     if (!sorted.length) {
-      tb.innerHTML = `<tr><td colspan="6" class="muted">Henuz model yuklenmemis — <a href="/ui/models">Modeller</a> sayfasindan ekleyin.</td></tr>`;
+      tb.innerHTML = `<tr><td colspan="6" class="muted">${t("Henuz model yuklenmemis —")} <a href="/ui/models">${t("Modeller")}</a> ${t("sayfasindan ekleyin.")}</td></tr>`;
     } else if (sorted.length > 8) {
       const tr = document.createElement("tr");
-      tr.innerHTML = `<td colspan="6" class="muted"><a href="/ui/models">+ ${sorted.length - 8} model daha — tumune git</a></td>`;
+      tr.innerHTML = `<td colspan="6" class="muted"><a href="/ui/models">${t("+ {n} model daha — tumune git", { n: sorted.length - 8 })}</a></td>`;
       tb.appendChild(tr);
     }
 
@@ -108,10 +108,10 @@
       const counts = {};
       for (const s of (models.states || [])) counts[s.status] = (counts[s.status] || 0) + 1;
       const order = ["loaded", "ready", "pulling", "queued", "passive", "unknown", "error"];
-      const labelTr = { loaded: "Yuklu", ready: "Hazir", pulling: "Iniyor", queued: "Sirada", passive: "Pasif", unknown: "Bilinmiyor", error: "Hata" };
+      const labelTr = { loaded: t("Yuklu"), ready: t("Hazir"), pulling: t("Iniyor"), queued: t("Sirada"), passive: t("Pasif"), unknown: t("Bilinmiyor"), error: t("Hata") };
       const colorOf = { loaded: "var(--ok)", ready: "var(--accent)", pulling: "var(--warn)", queued: "var(--warn)", passive: "var(--muted-2)", unknown: "var(--surface-3)", error: "var(--danger)" };
       const items = order.filter(k => counts[k]).map(k => ({ label: labelTr[k] || k, value: counts[k], color: colorOf[k] }));
-      Charts.bars(document.getElementById("statusBars"), items, { empty: "Henuz model yok" });
+      Charts.bars(document.getElementById("statusBars"), items, { empty: t("Henuz model yok") });
     }
   } catch (e) { console.error(e); }
 
@@ -119,16 +119,16 @@
   try {
     const usage = await api("/api/v1/usage/me");
     kvRows(document.getElementById("usageTable"), [
-      ["Kullanici", usage.username],
-      ["Departman", usage.department],
-      ["Toplam istek", usage.total_requests],
-      ["Toplam token", usage.total_tokens],
-      ["Ort. gecikme", usage.avg_latency_ms ? Math.round(usage.avg_latency_ms) + " ms" : "—"],
+      [t("Kullanici"), usage.username],
+      [t("Departman"), usage.department],
+      [t("Toplam istek"), usage.total_requests],
+      [t("Toplam token"), usage.total_tokens],
+      [t("Ort. gecikme"), usage.avg_latency_ms ? Math.round(usage.avg_latency_ms) + " ms" : "—"],
     ]);
     const tb2 = document.querySelector("#usageByModel tbody");
     tb2.innerHTML = "";
     const entries = Object.entries(usage.by_model || {});
-    if (!entries.length) tb2.innerHTML = `<tr><td colspan="2" class="muted">Henuz veri yok</td></tr>`;
+    if (!entries.length) tb2.innerHTML = `<tr><td colspan="2" class="muted">${t("Henuz veri yok")}</td></tr>`;
     else {
       for (const [m, c] of entries) {
         const tr = document.createElement("tr");
@@ -139,7 +139,7 @@
     if (window.Charts) {
       const items = entries.map(([m, c]) => ({ label: m, value: c }))
         .sort((a, b) => b.value - a.value).slice(0, 6);
-      Charts.bars(document.getElementById("usageBars"), items, { empty: "Henuz istek yok" });
+      Charts.bars(document.getElementById("usageBars"), items, { empty: t("Henuz istek yok") });
     }
   } catch (e) { console.error(e); }
 
@@ -176,19 +176,19 @@
       const place = m.loaded
         ? [m.vram_bytes ? `GPU ${fmtGb(m.vram_bytes)}` : "", m.ram_bytes ? `RAM ${fmtGb(m.ram_bytes)}` : ""].filter(Boolean).join(" + ")
         : kind === "active"
-        ? "bellege yukleniyor…"
-        : (m.disk_bytes ? `diskte ${fmtGb(m.disk_bytes)}` : "");
+        ? t("bellege yukleniyor…")
+        : (m.disk_bytes ? t("diskte {g}", { g: fmtGb(m.disk_bytes) }) : "");
       const extra = kind === "active"
-        ? `<span class="badge busy">${m.inflight_requests} istek isleniyor</span>`
+        ? `<span class="badge busy">${t("{n} istek isleniyor", { n: m.inflight_requests })}</span>`
         : kind === "warm" && m.expires_in_seconds != null
-        ? `<span class="muted mem-exp">~${fmtEta(m.expires_in_seconds)} sonra otomatik bosalir</span>`
+        ? `<span class="muted mem-exp">${t("~{e} sonra otomatik bosalir", { e: fmtEta(m.expires_in_seconds) })}</span>`
         : kind === "warming"
         ? `<span class="spin" aria-hidden="true"></span>`
         : "";
       let act = "";
       if (isAdmin) {
-        if (kind === "warm") act = `<button class="small" data-mem="unload" data-mid="${escapeHtml(m.model_id)}">Bellekten cikar</button>`;
-        if (kind === "disk") act = `<button class="small" data-mem="load" data-mid="${escapeHtml(m.model_id)}">Bellege yukle</button>`;
+        if (kind === "warm") act = `<button class="small" data-mem="unload" data-mid="${escapeHtml(m.model_id)}">${t("Bellekten cikar")}</button>`;
+        if (kind === "disk") act = `<button class="small" data-mem="load" data-mid="${escapeHtml(m.model_id)}">${t("Bellege yukle")}</button>`;
       }
       return `<div class="mem-row">
           <span class="mem-dot ${kind}" aria-hidden="true"></span>
@@ -205,10 +205,10 @@
     const totals = snap.totals || {};
     const budget = snap.budget || {};
     if (!snap.reachable) {
-      memSummary.textContent = "Ollama'ya ulasilamiyor";
+      memSummary.textContent = t("Ollama'ya ulasilamiyor");
       memBar.innerHTML = "";
       memLegend.innerHTML = "";
-      memGroups.innerHTML = `<div class="muted mem-empty">Motor (Ollama) erisilebilir oldugunda gercek bellek yerlesimi burada canli gorunur.</div>`;
+      memGroups.innerHTML = `<div class="muted mem-empty">${t("Motor (Ollama) erisilebilir oldugunda gercek bellek yerlesimi burada canli gorunur.")}</div>`;
       return;
     }
     const active = models.filter(m => m.pulled && m.inflight_requests > 0);
@@ -218,9 +218,9 @@
     const notPulled = models.filter(m => !m.pulled && !m.warming_up);
 
     memSummary.textContent =
-      `${totals.loaded_count || 0} model bellekte (${fmtGb(totals.memory_bytes)})` +
-      (totals.vram_bytes ? ` · GPU'da ${fmtGb(totals.vram_bytes)}` : "") +
-      ` · diskte toplam ${fmtGb(totals.disk_bytes)}`;
+      t("{n} model bellekte ({g})", { n: totals.loaded_count || 0, g: fmtGb(totals.memory_bytes) }) +
+      (totals.vram_bytes ? " · " + t("GPU'da {g}", { g: fmtGb(totals.vram_bytes) }) : "") +
+      " · " + t("diskte toplam {g}", { g: fmtGb(totals.disk_bytes) });
 
     const loaded = models.filter(m => m.loaded);
     const budgetBytes = (budget.total_gb || 0) * 1024 ** 3;
@@ -233,22 +233,22 @@
         `<span class="mem-key"><span class="dot" style="background:${MEM_PALETTE[i % MEM_PALETTE.length]};"></span>${escapeHtml(m.model_id)} · ${fmtGb(m.memory_bytes)}</span>`
       ).join("") +
       (budget.total_gb
-        ? `<span class="mem-key muted">ayrilan butce: ${fmtNumber(budget.total_gb, 1)} GB (${escapeHtml((budget.accelerator || "?").toUpperCase())})</span>`
+        ? `<span class="mem-key muted">${t("ayrilan butce: {g} GB", { g: fmtNumber(budget.total_gb, 1) })} (${escapeHtml((budget.accelerator || "?").toUpperCase())})</span>`
         : "");
 
     const bits = [];
-    if (notPulled.length) bits.push(`${notPulled.length} katalog modeli henuz indirilmemis`);
+    if (notPulled.length) bits.push(t("{n} katalog modeli henuz indirilmemis", { n: notPulled.length }));
     if ((snap.unmanaged || []).length) {
-      bits.push("Katalog disi (Ollama'da): " + snap.unmanaged
-        .map(u => `${u.ollama_tag} (${fmtGb(u.disk_bytes)}${u.loaded ? ", bellekte" : ""})`).join(", "));
+      bits.push(t("Katalog disi (Ollama'da): {list}", { list: snap.unmanaged
+        .map(u => `${u.ollama_tag} (${fmtGb(u.disk_bytes)}${u.loaded ? ", " + t("bellekte") : ""})`).join(", ") }));
     }
     const footer = bits.length ? `<div class="muted mem-foot">${escapeHtml(bits.join(" · "))}</div>` : "";
 
     const groups = [
-      { key: "active", title: "Aktif calisiyor", list: active, empty: "Su anda istek isleyen model yok." },
-      { key: "warming", title: "Bellege yukleniyor", list: warming, hideEmpty: true },
-      { key: "warm", title: "Bellekte hazir (sicak)", list: warm, empty: "Bellekte bekleyen model yok — ilk istekte otomatik yuklenir." },
-      { key: "disk", title: "Diskte hazir (bellekte degil)", list: onDisk, empty: "Indirilmis ama bellekte olmayan model yok." },
+      { key: "active", title: t("Aktif calisiyor"), list: active, empty: t("Su anda istek isleyen model yok.") },
+      { key: "warming", title: t("Bellege yukleniyor"), list: warming, hideEmpty: true },
+      { key: "warm", title: t("Bellekte hazir (sicak)"), list: warm, empty: t("Bellekte bekleyen model yok — ilk istekte otomatik yuklenir.") },
+      { key: "disk", title: t("Diskte hazir (bellekte degil)"), list: onDisk, empty: t("Indirilmis ama bellekte olmayan model yok.") },
     ];
     memGroups.innerHTML = groups.map(g => {
       if (g.hideEmpty && !g.list.length) return "";
@@ -268,14 +268,14 @@
       try {
         if (btn.dataset.mem === "load") {
           await api(`/api/v1/system/models/${encodeURIComponent(mid)}/load`, { method: "POST" });
-          toast(`${mid} bellege yukleniyor — hazir olunca "sicak" grubuna gecer`, "ok", 4000);
+          toast(t(`{m} bellege yukleniyor — hazir olunca "sicak" grubuna gecer`, { m: mid }), "ok", 4000);
         } else {
           await api(`/api/v1/system/models/${encodeURIComponent(mid)}/unload`, { method: "POST" });
-          toast(`${mid} bellekten cikarildi (disk kopyasi duruyor)`, "ok", 4000);
+          toast(t("{m} bellekten cikarildi (disk kopyasi duruyor)", { m: mid }), "ok", 4000);
         }
         setTimeout(refreshMemory, 600);
       } catch (err) {
-        toast("Hata: " + err.message, "error", 5000);
+        toast(t("Hata: {m}", { m: err.message }), "error", 5000);
         btn.disabled = false;
       }
     });
