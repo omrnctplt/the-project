@@ -3,57 +3,57 @@
 {% block content %}
 <div class="page-header">
   <div>
-    <h1>Ayarlar</h1>
-    <div class="subtitle">Profil, kullanicilar, denetim ve hesap ayarlari.</div>
+    <h1 data-i18n>Ayarlar</h1>
+    <div class="subtitle" data-i18n>Profil, kullanicilar, denetim ve hesap ayarlari.</div>
   </div>
   <div class="actions">
-    <button id="changePwBtn">Sifre degistir</button>
+    <button id="changePwBtn" data-i18n>Sifre degistir</button>
   </div>
 </div>
 
 <div class="tabs">
-  <button data-tab="settings" class="active">Calisma profili</button>
-  <button data-tab="categories">Kategori atamasi</button>
-  <button data-tab="users">Kullanicilar</button>
-  <button data-tab="usage">Kullanim</button>
-  <button data-tab="audit">Denetim kaydi</button>
+  <button data-tab="settings" class="active" data-i18n>Calisma profili</button>
+  <button data-tab="categories" data-i18n>Kategori atamasi</button>
+  <button data-tab="users" data-i18n>Kullanicilar</button>
+  <button data-tab="usage" data-i18n>Kullanim</button>
+  <button data-tab="audit" data-i18n>Denetim kaydi</button>
 </div>
 
 <div class="tab-panel active" data-panel="settings">
   <div class="card">
-    <h2>Kapasite profili</h2>
-    <p class="muted">Profil donanima gore otomatik secilir; manuel override mumkun. Profili degistirince yeniden plan uretilir.</p>
+    <h2 data-i18n>Kapasite profili</h2>
+    <p class="muted" data-i18n>Profil donanima gore otomatik secilir; manuel override mumkun. Profili degistirince yeniden plan uretilir.</p>
     <form id="configForm" class="grid two">
-      <label>Profil
+      <label><span data-i18n>Profil</span>
         <select id="profile">
-          <option value="auto">Auto (donanima gore)</option>
-          <option value="lite">Lite — cok dusuk kaynak</option>
-          <option value="balanced">Balanced — tipik laptop</option>
-          <option value="performance">Performance — GPU / yuksek RAM</option>
+          <option value="auto" data-i18n>Auto (donanima gore)</option>
+          <option value="lite" data-i18n>Lite — cok dusuk kaynak</option>
+          <option value="balanced" data-i18n>Balanced — tipik laptop</option>
+          <option value="performance" data-i18n>Performance — GPU / yuksek RAM</option>
         </select>
       </label>
-      <label>Beklenen kullanici sayisi
+      <label><span data-i18n>Beklenen kullanici sayisi</span>
         <input type="number" min="1" max="500" id="expectedUsers" />
       </label>
-      <label>Es zamanli istek
+      <label><span data-i18n>Es zamanli istek</span>
         <input type="number" min="1" max="20" id="expectedConcurrency" />
       </label>
-      <label>Idle unload (dakika)
+      <label><span data-i18n>Idle unload (dakika)</span>
         <input type="number" min="1" max="240" id="idleUnloadMinutes" />
       </label>
       <label class="checkbox">
         <input type="checkbox" id="autoPull" />
-        Eksik modelleri otomatik indir (onerilmiyor)
+        <span data-i18n>Eksik modelleri otomatik indir (onerilmiyor)</span>
       </label>
       <label class="checkbox">
         <input type="checkbox" id="manualOverride" />
-        Aktif model listesini manuel belirle
+        <span data-i18n>Aktif model listesini manuel belirle</span>
       </label>
-      <label class="full">Aktif model id'leri (virgulle)
-        <input type="text" id="activeModels" placeholder="orn: llama3.2-1b, qwen2.5-coder-1.5b" />
+      <label class="full"><span data-i18n>Aktif model id'leri (virgulle)</span>
+        <input type="text" id="activeModels" placeholder="orn: llama3.2-1b, qwen2.5-coder-1.5b" data-i18n-attrs="placeholder" />
       </label>
       <div class="full">
-        <button type="submit" class="primary">Kaydet ve yeniden planla</button>
+        <button type="submit" class="primary" data-i18n>Kaydet ve yeniden planla</button>
       </div>
     </form>
   </div>
@@ -61,11 +61,11 @@
 
 <div class="tab-panel" data-panel="categories">
   <div class="card">
-    <h2>Kategori → model atamasi</h2>
-    <p class="muted">Her amac icin hangi modellerin kullanilacagini secin. <strong>Bos birakirsaniz</strong> sistem, modelin kendi kategorisine gore otomatik secer. Bir kategoriye model atadiginizda, router o amactaki istekleri <strong>yalnizca secili modellere</strong> yonlendirir. Modeller indirilmemisse once Modeller sayfasindan pull edin.</p>
+    <h2 data-i18n>Kategori → model atamasi</h2>
+    <p class="muted"><span data-i18n>Her amac icin hangi modellerin kullanilacagini secin.</span> <strong data-i18n>Bos birakirsaniz</strong> <span data-i18n>sistem, modelin kendi kategorisine gore otomatik secer. Bir kategoriye model atadiginizda, router o amactaki istekleri</span> <strong data-i18n>yalnizca secili modellere</strong> <span data-i18n>yonlendirir. Modeller indirilmemisse once Modeller sayfasindan pull edin.</span></p>
     <div id="catAssignList"></div>
     <div style="margin-top:1rem;">
-      <button id="saveCatAssign" class="primary">Atamalari kaydet</button>
+      <button id="saveCatAssign" class="primary" data-i18n>Atamalari kaydet</button>
     </div>
   </div>
 </div>
@@ -73,12 +73,12 @@
 <div class="tab-panel" data-panel="users">
   <div class="card">
     <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap;">
-      <h2 style="margin:0;">Kullanicilar</h2>
-      <button id="newUserBtn" class="primary small">+ Yeni kullanici</button>
+      <h2 style="margin:0;" data-i18n>Kullanicilar</h2>
+      <button id="newUserBtn" class="primary small" data-i18n>+ Yeni kullanici</button>
     </div>
-    <p class="muted" style="font-size:0.8rem;">Calisanlara buradan hesap acin; LAN'daki herkes <code>http://&lt;sunucu-ip&gt;:8888</code> adresinden kendi hesabiyla giris yapar. Rol/departman degisikligi kullanicinin bir sonraki girisinde gecerli olur.</p>
+    <p class="muted" style="font-size:0.8rem;"><span data-i18n>Calisanlara buradan hesap acin; LAN'daki herkes</span> <code>http://&lt;sunucu-ip&gt;:8888</code> <span data-i18n>adresinden kendi hesabiyla giris yapar. Rol/departman degisikligi kullanicinin bir sonraki girisinde gecerli olur.</span></p>
     <table id="usersTable" class="data">
-      <thead><tr><th>Kullanici</th><th>Departman</th><th>Rol</th><th>Etiket</th><th>Son giris</th><th>Islem</th></tr></thead>
+      <thead><tr><th data-i18n>Kullanici</th><th data-i18n>Departman</th><th data-i18n>Rol</th><th data-i18n>Etiket</th><th data-i18n>Son giris</th><th data-i18n>Islem</th></tr></thead>
       <tbody></tbody>
     </table>
   </div>
@@ -87,16 +87,16 @@
 <div class="tab-panel" data-panel="usage">
   <div class="grid two">
     <div class="card">
-      <h2>Kullanici bazinda (son 30 gun)</h2>
+      <h2 data-i18n>Kullanici bazinda (son 30 gun)</h2>
       <table id="globalUsers" class="data">
-        <thead><tr><th>Kullanici</th><th>Istek</th><th>Token</th></tr></thead>
+        <thead><tr><th data-i18n>Kullanici</th><th data-i18n>Istek</th><th>Token</th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
     <div class="card">
-      <h2>Model bazinda (son 30 gun)</h2>
+      <h2 data-i18n>Model bazinda (son 30 gun)</h2>
       <table id="globalModels" class="data">
-        <thead><tr><th>Model</th><th>Istek</th><th>Ort. ms</th></tr></thead>
+        <thead><tr><th>Model</th><th data-i18n>Istek</th><th data-i18n>Ort. ms</th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
@@ -105,9 +105,9 @@
 
 <div class="tab-panel" data-panel="audit">
   <div class="card">
-    <h2>Denetim kaydi (son 100)</h2>
+    <h2 data-i18n>Denetim kaydi (son 100)</h2>
     <table id="auditTable" class="data">
-      <thead><tr><th>Zaman</th><th>Kullanici</th><th>Dept</th><th>Model</th><th>Kural</th><th>Fallback</th><th>Durum</th><th>ms</th></tr></thead>
+      <thead><tr><th data-i18n>Zaman</th><th data-i18n>Kullanici</th><th data-i18n>Dept</th><th>Model</th><th data-i18n>Kural</th><th>Fallback</th><th data-i18n>Durum</th><th>ms</th></tr></thead>
       <tbody></tbody>
     </table>
   </div>

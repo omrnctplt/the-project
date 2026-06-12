@@ -387,6 +387,13 @@ Ortak altyapi: tema (acik/koyu/sistem), mobil drawer, toast'lar, erisilebilirlik
 (odak halkalari, `aria-live`, `prefers-reduced-motion`), **global indirme
 gostergesi** (her sayfada).
 
+**Dil destegi (i18n):** Kenar cubugundaki TR/EN anahtari tum arayuzu cevirir;
+tercih `localStorage`'da kalicidir. Tasarim bilincli olarak hafif: Turkce kaynak
+metin sozluk anahtaridir, `i18n.js` icindeki EN sozlugu `t()` (JS) ve
+`data-i18n` (sablon) uzerinden uygulanir — backend'e dokunulmaz, yeni dil
+eklemek tek sozluk dosyasi isidir. Kapsam disi: KVKK aydinlatma metni (Turkiye
+hukukuna ozgu hukuki metin) ve backend API hata mesajlari.
+
 ---
 
 ## 9. Guvenlik ve KVKK

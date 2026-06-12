@@ -4,7 +4,7 @@
   let profile = null;
   try {
     profile = await api("/api/v1/system/profile");
-  } catch (e) { toast("Profil alinamadi: " + e.message, "error"); return; }
+  } catch (e) { toast(t("Profil alinamadi: {m}", { m: e.message }), "error"); return; }
   const hw = profile.hardware || {};
   const cap = profile.capacity || {};
 
@@ -13,17 +13,17 @@
     <div class="stat">
       <div class="stat-label">CPU</div>
       <div class="stat-value">${hw.cpu?.logical_cores || "?"}</div>
-      <div class="stat-sub">${hw.cpu?.physical_cores || "?"} fiziksel cekirdek</div>
+      <div class="stat-sub">${t("{n} fiziksel cekirdek", { n: hw.cpu?.physical_cores || "?" })}</div>
     </div>
     <div class="stat">
-      <div class="stat-label">Bellek (effective)</div>
+      <div class="stat-label">${t("Bellek (effective)")}</div>
       <div class="stat-value">${fmtNumber(hw.memory?.effective_total_gb, 1)} GB</div>
       <div class="stat-sub">${hw.memory?.effective_source || "—"}</div>
     </div>
     <div class="stat ${hw.gpu?.available ? "ok" : "warn"}">
       <div class="stat-label">GPU</div>
-      <div class="stat-value">${hw.gpu?.available ? fmtNumber(hw.gpu.vram_total_gb, 1) + " GB" : "yok"}</div>
-      <div class="stat-sub">${hw.gpu?.available ? (hw.gpu.devices[0]?.name || "") : "CPU modunda yavas olabilir"}</div>
+      <div class="stat-value">${hw.gpu?.available ? fmtNumber(hw.gpu.vram_total_gb, 1) + " GB" : t("yok")}</div>
+      <div class="stat-sub">${hw.gpu?.available ? (hw.gpu.devices[0]?.name || "") : t("CPU modunda yavas olabilir")}</div>
     </div>`;
 
   const accel = cap.accelerator || "cpu";
@@ -37,7 +37,7 @@
 
   const recHint = document.getElementById("recHint");
   if (recHint) {
-    recHint.textContent = `Donanim sinifiniz: ${(cap.hardware_tier || "?").toUpperCase()} · ${(accel || "?").toUpperCase()}`;
+    recHint.textContent = t("Donanim sinifiniz: {tier} · {accel}", { tier: (cap.hardware_tier || "?").toUpperCase(), accel: (accel || "?").toUpperCase() });
   }
 
   if (!isAdmin) {
@@ -45,10 +45,9 @@
     notice.className = "card";
     notice.style.cssText = "margin:0.75rem 0 1rem; border-left:3px solid var(--warn);";
     notice.innerHTML = `
-      <strong>Sistemde henuz kurulu model yok.</strong>
-      <p class="muted" style="margin:0.4rem 0 0.6rem;">Model kurulumu yonetici yetkisi gerektirir.
-      Asagidaki liste donaniminiza uygun modelleri gosterir; kurulum icin yoneticinize iletebilirsiniz.</p>
-      <a href="/ui/dashboard" class="nav-item" style="display:inline-block;">Panele don →</a>`;
+      <strong>${t("Sistemde henuz kurulu model yok.")}</strong>
+      <p class="muted" style="margin:0.4rem 0 0.6rem;">${t("Model kurulumu yonetici yetkisi gerektirir. Asagidaki liste donaniminiza uygun modelleri gosterir; kurulum icin yoneticinize iletebilirsiniz.")}</p>
+      <a href="/ui/dashboard" class="nav-item" style="display:inline-block;">${t("Panele don")} →</a>`;
     list.parentElement.insertBefore(notice, list);
   }
 
@@ -63,7 +62,7 @@
       if (m.recommended) cls += " in-catalog";
       if (fits) cls += " fits-current";
       card.className = cls;
-      const recBadge = m.recommended ? '<span class="badge ok">donaniminiza onerilen</span>' : "";
+      const recBadge = m.recommended ? `<span class="badge ok">${t("donaniminiza onerilen")}</span>` : "";
       const srcBadge = m.source === "huggingface" ? '<span class="badge busy">HF</span>' : "";
       card.innerHTML = `
         <div class="head">
@@ -77,24 +76,24 @@
         <div class="meta">
           <span class="badge plain">~${m.approx_gb} GB</span>
           <span class="badge plain">${escapeHtml(m.tier)}</span>
-          ${fits ? '<span class="badge ok">bellege sigar</span>' : '<span class="badge warn">bellek yetersiz</span>'}
+          ${fits ? `<span class="badge ok">${t("bellege sigar")}</span>` : `<span class="badge warn">${t("bellek yetersiz")}</span>`}
           ${srcBadge}
           ${recBadge}
         </div>
         <div class="actions">
           ${isAdmin ? `
           <button class="primary" data-tag="${escapeHtml(m.tag)}" data-mid="${escapeHtml(m.model_id || "")}" data-cat="${m.category}" data-gb="${m.approx_gb}" data-label="${escapeHtml(m.label)}" ${fits ? "" : "disabled"}>
-            ${m.pulled ? "Indirilmis ✓" : "Ekle ve pull et"}
+            ${m.pulled ? t("Indirilmis") + " ✓" : t("Ekle ve pull et")}
           </button>
-          <button data-skip="1" class="ghost">Atlat</button>
+          <button data-skip="1" class="ghost">${t("Atlat")}</button>
           ` : `
-          <span class="muted" style="font-size:0.78rem;">${m.pulled ? "Kurulu ✓" : "Kurulum yonetici yetkisi gerektirir"}</span>
+          <span class="muted" style="font-size:0.78rem;">${m.pulled ? t("Kurulu") + " ✓" : t("Kurulum yonetici yetkisi gerektirir")}</span>
           `}
         </div>`;
       list.appendChild(card);
     }
     if (!items.length) {
-      list.innerHTML = `<div class="muted" style="grid-column:1/-1; padding:2rem;">Bu kategoride oneri yok.</div>`;
+      list.innerHTML = `<div class="muted" style="grid-column:1/-1; padding:2rem;">${t("Bu kategoride oneri yok.")}</div>`;
     }
   }
   render();
@@ -116,7 +115,7 @@
     if (!btn) return;
     btn.disabled = true;
     const original = btn.textContent;
-    btn.textContent = "Ekleniyor...";
+    btn.textContent = t("Ekleniyor...");
     try {
       const tag = btn.dataset.tag;
       // Katalogdaki gercek id'yi kullan; yoksa ortak kuralla turet (mukerrer kayit onlenir)
@@ -141,11 +140,11 @@
       }
       // Trigger pull
       await api(`/api/v1/system/pull/${encodeURIComponent(modelId)}`, { method: "POST" });
-      toast(`Pull baslatildi: ${btn.dataset.label}`, "ok");
-      btn.textContent = "Pull baslatildi ✓";
+      toast(t("Pull baslatildi: {m}", { m: btn.dataset.label }), "ok");
+      btn.textContent = t("Pull baslatildi") + " ✓";
       setTimeout(() => { location.href = "/ui/chat"; }, 1200);
     } catch (err) {
-      toast("Hata: " + err.message, "error", 5000);
+      toast(t("Hata: {m}", { m: err.message }), "error", 5000);
       btn.disabled = false;
       btn.textContent = original;
     }

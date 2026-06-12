@@ -16,7 +16,7 @@
 
   function newConv() {
     const id = "c" + Date.now();
-    const c = { id, title: "Yeni sohbet", created_at: Date.now(), messages: [] };
+    const c = { id, title: t("Yeni sohbet"), created_at: Date.now(), messages: [] };
     convs.unshift(c);
     saveConvs(convs);
     activeId = id;
@@ -67,15 +67,15 @@
       const li = document.createElement("li");
       li.className = "conv" + (c.id === activeId ? " active" : "");
       li.innerHTML = `
-        <span class="title">${escapeHtml(c.title || "Sohbet")}</span>
-        <button class="del" data-del="${c.id}" title="Sil" aria-label="Sohbeti sil">✕</button>`;
+        <span class="title">${escapeHtml(c.title || t("Sohbet"))}</span>
+        <button class="del" data-del="${c.id}" title="${t("Sil")}" aria-label="${t("Sohbeti sil")}">✕</button>`;
       li.onclick = async (e) => {
         if (e.target.dataset.del) {
           const id = e.target.dataset.del;
           const ok = await confirmModal({
-            title: "Sohbeti sil",
-            body: "Bu sohbet kalici olarak silinecek. Emin misiniz?",
-            primary: "Sil",
+            title: t("Sohbeti sil"),
+            body: t("Bu sohbet kalici olarak silinecek. Emin misiniz?"),
+            primary: t("Sil"),
           });
           if (!ok) return;
           deleteConv(id);
@@ -88,7 +88,7 @@
       convListEl.appendChild(li);
     }
     if (!convs.length) {
-      convListEl.innerHTML = `<li class="muted" style="padding:0.5rem 0.6rem; font-size:0.8rem;">Henuz sohbet yok.</li>`;
+      convListEl.innerHTML = `<li class="muted" style="padding:0.5rem 0.6rem; font-size:0.8rem;">${t("Henuz sohbet yok.")}</li>`;
     }
   }
 
@@ -96,14 +96,14 @@
     const c = getActive();
     body.innerHTML = "";
     if (!c || !c.messages.length) {
-      titleEl.textContent = c?.title || "Yeni sohbet";
+      titleEl.textContent = c?.title || t("Yeni sohbet");
       const dep = user.department || "general";
       const examples = examplePromptsFor(dep);
       body.innerHTML = `
         <div class="chat-empty">
           <div class="chat-empty-logo" aria-hidden="true"></div>
-          <h2>Merhaba ${escapeHtml(user.label || user.username || "")}</h2>
-          <p><strong>${escapeHtml(dep)}</strong> departmaniniza atanmis modele otomatik yonlendireceğim. Asagidan birini secebilir veya kendi sorunuzu yazabilirsiniz.</p>
+          <h2>${t("Merhaba {name}", { name: escapeHtml(user.label || user.username || "") })}</h2>
+          <p>${t("{d} departmaniniza atanmis modele otomatik yonlendireceğim. Asagidan birini secebilir veya kendi sorunuzu yazabilirsiniz.", { d: `<strong>${escapeHtml(dep)}</strong>` })}</p>
           <div class="examples">
             ${examples.map(ex => `
               <button class="ex-card" type="button" data-ex="${escapeHtml(ex.prompt)}">
@@ -122,7 +122,7 @@
       });
       return;
     }
-    titleEl.textContent = c.title || "Sohbet";
+    titleEl.textContent = c.title || t("Sohbet");
     for (let i = 0; i < c.messages.length; i++) {
       const m = c.messages[i];
       const isLast = i === c.messages.length - 1 && m.role === "assistant" && !m.streaming;
@@ -158,8 +158,8 @@
     let actions = "";
     if (m.role === "assistant" && !m.streaming && m.content) {
       actions = `<div class="msg-actions">
-          <button class="msg-act" type="button" data-act="copy" title="Yaniti kopyala">⧉ Kopyala</button>
-          ${opts.isLast ? '<button class="msg-act" type="button" data-act="regen" title="Yeniden uret">↻ Yeniden uret</button>' : ""}
+          <button class="msg-act" type="button" data-act="copy" title="${t("Yaniti kopyala")}">⧉ ${t("Kopyala")}</button>
+          ${opts.isLast ? `<button class="msg-act" type="button" data-act="regen" title="${t("Yeniden uret")}">↻ ${t("Yeniden uret")}</button>` : ""}
         </div>`;
     }
 
@@ -176,26 +176,26 @@
   function examplePromptsFor(dep) {
     const map = {
       engineering: [
-        { title: "Kod review", sub: "Bu fonksiyonu daha temiz nasil yazarim?", prompt: "Asagidaki Python fonksiyonunu daha temiz hale getir:\n\ndef calc(items):\n    s = 0\n    for i in items:\n        if i > 0: s += i\n    return s" },
-        { title: "Bug ariyorum", sub: "Hata mesajini birlikte inceleyelim", prompt: "Su hatayi aliyorum, sebebi ne olabilir: 'TypeError: cannot unpack non-iterable NoneType object'" },
+        { title: t("Kod review"), sub: t("Bu fonksiyonu daha temiz nasil yazarim?"), prompt: t("Asagidaki Python fonksiyonunu daha temiz hale getir:\n\ndef calc(items):\n    s = 0\n    for i in items:\n        if i > 0: s += i\n    return s") },
+        { title: t("Bug ariyorum"), sub: t("Hata mesajini birlikte inceleyelim"), prompt: t("Su hatayi aliyorum, sebebi ne olabilir: 'TypeError: cannot unpack non-iterable NoneType object'") },
       ],
       hr: [
-        { title: "Mulakat sorulari", sub: "Junior developer icin 5 soru", prompt: "Junior bir Python developer pozisyonu icin teknik ve davranissal toplam 5 mulakat sorusu yaz." },
-        { title: "Izin politikasi", sub: "Kisaca ozet", prompt: "Yillik iznin kisaca nasil hesaplandigini 3 maddede acikla." },
+        { title: t("Mulakat sorulari"), sub: t("Junior developer icin 5 soru"), prompt: t("Junior bir Python developer pozisyonu icin teknik ve davranissal toplam 5 mulakat sorusu yaz.") },
+        { title: t("Izin politikasi"), sub: t("Kisaca ozet"), prompt: t("Yillik iznin kisaca nasil hesaplandigini 3 maddede acikla.") },
       ],
       finance: [
-        { title: "Hizli hesap", sub: "KDV dahil/haric", prompt: "Hesapla: 12500 TL'lik bir hizmetin %20 KDV dahil ve haric tutari nedir? Aciklamali yaz." },
-        { title: "Tahmin", sub: "Aylik gelir tahmini", prompt: "Asagidaki son 6 ay gelir verisine bakarak gelecek 3 ayi tahmin et: 120k, 135k, 128k, 142k, 150k, 145k" },
+        { title: t("Hizli hesap"), sub: t("KDV dahil/haric"), prompt: t("Hesapla: 12500 TL'lik bir hizmetin %20 KDV dahil ve haric tutari nedir? Aciklamali yaz.") },
+        { title: t("Tahmin"), sub: t("Aylik gelir tahmini"), prompt: t("Asagidaki son 6 ay gelir verisine bakarak gelecek 3 ayi tahmin et: 120k, 135k, 128k, 142k, 150k, 145k") },
       ],
       legal: [
-        { title: "Sozlesme ozeti", sub: "Kisaca ana noktalar", prompt: "Bir SaaS hizmet sozlesmesindeki en kritik 5 maddeyi ozetle." },
+        { title: t("Sozlesme ozeti"), sub: t("Kisaca ana noktalar"), prompt: t("Bir SaaS hizmet sozlesmesindeki en kritik 5 maddeyi ozetle.") },
       ],
       marketing: [
-        { title: "Reklam metni", sub: "3 farkli ton", prompt: "Bir yeni mobil bankacilik uygulamasi icin: profesyonel, samimi ve mizahi tonda birer Twitter reklami yaz." },
+        { title: t("Reklam metni"), sub: t("3 farkli ton"), prompt: t("Bir yeni mobil bankacilik uygulamasi icin: profesyonel, samimi ve mizahi tonda birer Twitter reklami yaz.") },
       ],
       general: [
-        { title: "Acikla", sub: "Konsept anlama", prompt: "Docker container ile sanal makine farkini bana 3 cumlede acikla." },
-        { title: "Ceviri", sub: "Hizli ceviri", prompt: "Lutfen su cumleyi Ingilizce'ye dogru cevir: 'Bu projeyi onumuzdeki hafta teslim edebiliriz.'" },
+        { title: t("Acikla"), sub: t("Konsept anlama"), prompt: t("Docker container ile sanal makine farkini bana 3 cumlede acikla.") },
+        { title: t("Ceviri"), sub: t("Hizli ceviri"), prompt: t("Lutfen su cumleyi Ingilizce'ye dogru cevir: 'Bu projeyi onumuzdeki hafta teslim edebiliriz.'") },
       ],
     };
     return map[dep] || map.general;
@@ -217,7 +217,7 @@
   function setGenerating(on) {
     isGenerating = on;
     sendBtn.classList.toggle("stop", on);
-    sendBtn.textContent = on ? "◼ Durdur" : "Gonder ↵";
+    sendBtn.textContent = on ? t("◼ Durdur") : t("Gonder ↵");
     promptEl.disabled = false;
   }
 
@@ -284,12 +284,12 @@
     } catch (err) {
       if (err.name === "AbortError") {
         aborted = true;
-        if (!asst.content) asst.content = "_(durduruldu)_";
-        else asst.content += "\n\n_(durduruldu)_";
+        if (!asst.content) asst.content = t("_(durduruldu)_");
+        else asst.content += "\n\n" + t("_(durduruldu)_");
       } else {
-        asst.content = `**Hata:** ${err.message}`;
+        asst.content = t("**Hata:** {m}", { m: err.message });
         asst.meta = { model_id: "—", category: "error" };
-        toast("Istek basarisiz: " + err.message, "error", 5000);
+        toast(t("Istek basarisiz: {m}", { m: err.message }), "error", 5000);
       }
     } finally {
       asst.streaming = false;
@@ -322,7 +322,7 @@
       throw new Error(detail);
     }
     const r = await resp.json();
-    asst.content = r.response || "(bos yanit)";
+    asst.content = r.response || t("(bos yanit)");
     asst.meta = {
       model_id: r.model_id, category: r.category,
       matched_rule: r.matched_rule, fallback_triggered: r.fallback_triggered,
@@ -378,7 +378,7 @@
           }
           if (evt.done) evalCount = evt.eval_count || 0;
         } else if (evt.event === "error") {
-          throw new Error(evt.detail || "Stream hatasi");
+          throw new Error(evt.detail || t("Stream hatasi"));
         }
       }
     }
@@ -406,21 +406,21 @@
         pull_eta_seconds: evt.eta_seconds,
       };
       if (attributed && p.status !== "queued" && (p.pull_progress || 0) >= 1) {
-        return `<div class="gen-status"><div class="gs-row"><span class="spin" aria-hidden="true"></span><span>Model indirildi — bellege yukleniyor…</span></div></div>`;
+        return `<div class="gen-status"><div class="gs-row"><span class="spin" aria-hidden="true"></span><span>${t("Model indirildi — bellege yukleniyor…")}</span></div></div>`;
       }
       const title = !attributed
-        ? `Sunucuda bir model indiriliyor: ${escapeHtml(evt.model_id || "?")} — yanitiniz bunu bekliyor olabilir`
+        ? t("Sunucuda bir model indiriliyor: {m} — yanitiniz bunu bekliyor olabilir", { m: escapeHtml(evt.model_id || "?") })
         : p.status === "queued"
-        ? `${escapeHtml(evt.model_id || "Model")} indirme sirasinda`
-        : `${escapeHtml(evt.model_id || "Model")} ilk kez kullaniliyor — indiriliyor`;
+        ? t("{m} indirme sirasinda", { m: escapeHtml(evt.model_id || "Model") })
+        : t("{m} ilk kez kullaniliyor — indiriliyor", { m: escapeHtml(evt.model_id || "Model") });
       return `
         <div class="gen-status">
           <div class="gs-row"><span class="spin" aria-hidden="true"></span><span>${title}</span></div>
           ${pullProgressHtml(p)}
-          ${attributed ? '<div class="gs-note">Tek seferlik indirme; tamamlaninca yanit otomatik baslayacak.</div>' : ""}
+          ${attributed ? `<div class="gs-note">${t("Tek seferlik indirme; tamamlaninca yanit otomatik baslayacak.")}</div>` : ""}
         </div>`;
     }
-    return `<div class="gen-status"><div class="gs-row"><span class="spin" aria-hidden="true"></span><span>Model hazirlaniyor…</span></div></div>`;
+    return `<div class="gen-status"><div class="gs-row"><span class="spin" aria-hidden="true"></span><span>${t("Model hazirlaniyor…")}</span></div></div>`;
   }
 
   function updateGenStatus(evt, targetConvId) {
@@ -476,11 +476,11 @@
 
     if (btn.dataset.act === "copy") {
       const ok = await copyToClipboard(conv.messages[idx].content || "");
-      toast(ok ? "Yanit kopyalandi" : "Kopyalanamadi", ok ? "ok" : "warn", 2000);
+      toast(ok ? t("Yanit kopyalandi") : t("Kopyalanamadi"), ok ? "ok" : "warn", 2000);
     } else if (btn.dataset.act === "regen") {
       if (isGenerating) return;
       const lastUser = [...conv.messages].reverse().find(m => m.role === "user");
-      if (!lastUser) { toast("Yeniden uretilecek soru yok", "warn"); return; }
+      if (!lastUser) { toast(t("Yeniden uretilecek soru yok"), "warn"); return; }
       if (conv.messages[conv.messages.length - 1]?.role === "assistant") {
         conv.messages.pop();
       }
@@ -502,26 +502,26 @@
   if (exportBtn) {
     exportBtn.onclick = () => {
       const c = getActive();
-      if (!c || !c.messages.length) { toast("Disa aktarilacak sohbet yok", "warn"); return; }
-      let md = `# ${c.title || "Sohbet"}\n\n`;
+      if (!c || !c.messages.length) { toast(t("Disa aktarilacak sohbet yok"), "warn"); return; }
+      let md = `# ${c.title || t("Sohbet")}\n\n`;
       for (const m of c.messages) {
         if (m.role === "user") {
-          md += `**Soru:**\n\n${m.content}\n\n`;
+          md += `${t("**Soru:**")}\n\n${m.content}\n\n`;
         } else {
           const tag = m.meta?.model_id ? ` — ${m.meta.model_id}` : "";
-          md += `**Yanit${tag}:**\n\n${m.content}\n\n---\n\n`;
+          md += `${t("**Yanit{tag}:**", { tag })}\n\n${m.content}\n\n---\n\n`;
         }
       }
       const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = (c.title || "sohbet").replace(/[^\w-]+/g, "_").slice(0, 40) + ".md";
+      a.download = (c.title || t("sohbet")).replace(/[^\w-]+/g, "_").slice(0, 40) + ".md";
       document.body.appendChild(a);
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
-      toast("Sohbet markdown olarak indirildi", "ok");
+      toast(t("Sohbet markdown olarak indirildi"), "ok");
     };
   }
 

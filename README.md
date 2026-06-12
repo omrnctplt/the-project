@@ -131,6 +131,49 @@ ROCm kurulumu gerektirmeden `amdgpu` sysfs arayuzunden okunur. Tuketici AMD
 kartlari (RX 6xxx/7xxx) icin gerekirse `.env`'de `HSA_OVERRIDE_GFX_VERSION`
 ayarlayin (ornek: RX 6700 XT → `10.3.0`).
 
+### GPU'yu sonradan etkinlestirme (sil-kur GEREKMEZ)
+
+CPU modunda (`docker compose up -d --build`) kurdunuz, sonradan GPU eklemek
+istiyorsunuz — **hicbir sey silmeyin**. Compose yalnizca degisen container'lari
+yeniden olusturur; volume'lar (indirilen modeller, kullanici veritabani, audit)
+oldugu gibi korunur. Tek yapilacak:
+
+```bash
+make up        # GPU'yu algilar, dogru overlay ile YERINDE yukseltir
+```
+
+ya da elle: `docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d`
+(AMD icin `docker-compose.rocm.yml`). Ayni komut gateway + ollama'yi GPU
+erisimli olarak yeniden olusturur; sistem acilista donanimi yeniden olcup
+kapasite profilini gunceller. Geri donmek de aynidir: `make up-cpu`.
+
+**On kosul — NVIDIA (Linux):** Docker'in GPU'ya erisebilmesi icin
+[NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) kurulu olmali:
+
+```bash
+# Ubuntu/Debian
+curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | \
+  sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
+  sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
+  sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+sudo apt-get update && sudo apt-get install -y nvidia-container-toolkit
+sudo nvidia-ctk runtime configure --runtime=docker && sudo systemctl restart docker
+# Dogrulama:
+docker run --rm --gpus all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi
+```
+
+**On kosul — NVIDIA (Windows):** Docker Desktop + WSL2 backend + guncel NVIDIA
+surucusu yeterlidir (toolkit kurulumu gerekmez); Docker Desktop → Settings →
+Resources → WSL integration acik olmali. `scripts\up.ps1` gerisini halleder.
+
+**On kosul — AMD (yalnizca Linux):** `amdgpu` cekirdek surucusu (cogu dagitimda
+hazir gelir) ve `/dev/kfd` cihazinin varligi yeterli — ROCm'i kurmaniza gerek
+yok, `ollama/ollama:rocm` image'inin icinde gelir. Kontrol: `ls -l /dev/kfd`.
+
+`make up` GPU'yu gorur ama toolkit eksikse kurulum linkiyle uyarir ve CPU
+modunda devam eder — kurulum asla yarida kalmaz.
+
 ### 3. UI'yi ac
 
 | URL | Aciklama |

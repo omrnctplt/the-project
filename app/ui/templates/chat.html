@@ -4,37 +4,37 @@
 {% block content %}
 <div class="chat-layout">
   <aside class="chat-sidebar">
-    <button class="new-chat-btn" id="newChatBtn">+ Yeni sohbet</button>
-    <div class="muted" style="font-size:0.7rem; text-transform:uppercase; letter-spacing:0.08em; padding:0.5rem 0.25rem 0.1rem;">Gecmis</div>
+    <button class="new-chat-btn" id="newChatBtn">+ <span data-i18n>Yeni sohbet</span></button>
+    <div class="muted" data-i18n style="font-size:0.7rem; text-transform:uppercase; letter-spacing:0.08em; padding:0.5rem 0.25rem 0.1rem;">Gecmis</div>
     <ul class="conv-list" id="convList"></ul>
   </aside>
   <div class="chat-main">
     <div class="chat-header">
-      <div class="title" id="chatTitle">Yeni sohbet</div>
+      <div class="title" id="chatTitle" data-i18n>Yeni sohbet</div>
       <div class="meta-controls">
         <label class="checkbox" style="margin:0; font-size:0.8rem;">
           <input type="checkbox" id="streamToggle" checked /> Streaming
         </label>
         <label style="margin:0; font-size:0.8rem; display:flex; align-items:center; gap:0.35rem;">
-          Yaraticilik
-          <select id="tempSelect" style="width:auto; padding:0.25rem 0.45rem; font-size:0.78rem;" aria-label="Yanit yaraticiligi (temperature)">
-            <option value="">Varsayilan</option>
-            <option value="0.2">Kesin</option>
-            <option value="0.6">Dengeli</option>
-            <option value="1.0">Yaratici</option>
+          <span data-i18n>Yaraticilik</span>
+          <select id="tempSelect" style="width:auto; padding:0.25rem 0.45rem; font-size:0.78rem;" aria-label="Yanit yaraticiligi (temperature)" data-i18n-attrs="aria-label">
+            <option value="" data-i18n>Varsayilan</option>
+            <option value="0.2" data-i18n>Kesin</option>
+            <option value="0.6" data-i18n>Dengeli</option>
+            <option value="1.0" data-i18n>Yaratici</option>
           </select>
         </label>
-        <button id="exportBtn" class="small ghost" type="button" title="Sohbeti markdown olarak indir">⤓ Disa aktar</button>
-        <select id="adminModel" class="hidden"><option value="">(otomatik)</option></select>
+        <button id="exportBtn" class="small ghost" type="button" title="Sohbeti markdown olarak indir" data-i18n-attrs="title">⤓ <span data-i18n>Disa aktar</span></button>
+        <select id="adminModel" class="hidden"><option value="" data-i18n>(otomatik)</option></select>
       </div>
     </div>
     <div class="chat-body" id="chatBody"></div>
     <div class="chat-input-area">
       <form id="chatForm" class="input-wrap">
-        <textarea id="prompt" rows="1" placeholder="Bir sey sorun... (Enter ile gonder, Shift+Enter yeni satir)"></textarea>
+        <textarea id="prompt" rows="1" placeholder="Bir sey sorun... (Enter ile gonder, Shift+Enter yeni satir)" data-i18n-attrs="placeholder"></textarea>
         <div class="controls">
-          <span class="hint"><span class="kbd">Enter</span> gonder · <span class="kbd">Shift+Enter</span> yeni satir</span>
-          <button type="submit" class="primary" id="sendBtn">Gonder ↵</button>
+          <span class="hint"><span class="kbd">Enter</span> <span data-i18n>gonder</span> · <span class="kbd">Shift+Enter</span> <span data-i18n>yeni satir</span></span>
+          <button type="submit" class="primary" id="sendBtn"><span data-i18n>Gonder</span> ↵</button>
         </div>
       </form>
     </div>

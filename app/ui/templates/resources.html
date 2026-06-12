@@ -3,12 +3,12 @@
 {% block content %}
 <div class="page-header">
   <div>
-    <h1>Sistem Kaynaklari</h1>
-    <div class="subtitle">Host CPU, bellek, disk, GPU + Docker container'lari + en cok tuketen process'ler.</div>
+    <h1 data-i18n>Sistem Kaynaklari</h1>
+    <div class="subtitle" data-i18n>Host CPU, bellek, disk, GPU + Docker container'lari + en cok tuketen process'ler.</div>
   </div>
   <div class="actions">
-    <label class="checkbox" style="margin:0;"><input type="checkbox" id="autoRefresh" checked /> Otomatik yenile (5sn)</label>
-    <button id="refreshBtn" class="ghost">Yenile</button>
+    <label class="checkbox" style="margin:0;"><input type="checkbox" id="autoRefresh" checked /> <span data-i18n>Otomatik yenile (5sn)</span></label>
+    <button id="refreshBtn" class="ghost" data-i18n>Yenile</button>
   </div>
 </div>
 
@@ -23,7 +23,7 @@
     <div class="progress" style="margin-top:0.6rem;"><div class="bar" id="vCpuBar"></div></div>
   </div>
   <div class="stat" id="statMem">
-    <div class="stat-label">Bellek</div>
+    <div class="stat-label" data-i18n>Bellek</div>
     <div class="stat-value" id="vMem">—</div>
     <div class="stat-sub" id="vMemSub">—</div>
     <div class="progress" style="margin-top:0.6rem;"><div class="bar" id="vMemBar"></div></div>
@@ -40,23 +40,23 @@
 <section class="grid three" id="gpuSection" style="display:none; margin-bottom:1rem;"></section>
 
 <section class="card" id="containersCard" style="margin-bottom:1rem;">
-  <h2>Docker container'lari</h2>
+  <h2 data-i18n>Docker container'lari</h2>
   <table class="data" id="containersTable">
-    <thead><tr><th>Container</th><th>CPU %</th><th>Bellek</th><th>Bellek %</th><th>Net I/O</th><th>Block I/O</th></tr></thead>
+    <thead><tr><th>Container</th><th>CPU %</th><th data-i18n>Bellek</th><th data-i18n>Bellek %</th><th>Net I/O</th><th>Block I/O</th></tr></thead>
     <tbody></tbody>
   </table>
 </section>
 
 <section class="card">
   <div class="tabs">
-    <button data-tab="cpu" class="active">En cok CPU (top 8)</button>
-    <button data-tab="mem">En cok Bellek (top 8)</button>
+    <button data-tab="cpu" class="active" data-i18n>En cok CPU (top 8)</button>
+    <button data-tab="mem" data-i18n>En cok Bellek (top 8)</button>
   </div>
   <div class="tab-panel active" data-panel="cpu">
-    <table class="data"><thead><tr><th>Process</th><th>PID</th><th>User</th><th>CPU %</th><th>Bellek</th></tr></thead><tbody id="cpuTable"></tbody></table>
+    <table class="data"><thead><tr><th>Process</th><th>PID</th><th>User</th><th>CPU %</th><th data-i18n>Bellek</th></tr></thead><tbody id="cpuTable"></tbody></table>
   </div>
   <div class="tab-panel" data-panel="mem">
-    <table class="data"><thead><tr><th>Process</th><th>PID</th><th>User</th><th>Bellek %</th><th>RSS (MB)</th></tr></thead><tbody id="memTable"></tbody></table>
+    <table class="data"><thead><tr><th>Process</th><th>PID</th><th>User</th><th data-i18n>Bellek %</th><th>RSS (MB)</th></tr></thead><tbody id="memTable"></tbody></table>
   </div>
 </section>
 {% endblock %}

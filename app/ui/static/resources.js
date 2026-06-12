@@ -13,7 +13,7 @@
         const main = document.querySelector("main") || document.body;
         main.insertBefore(b, main.firstChild);
       }
-      b.innerHTML = `<strong>Kaynak verisi alinamiyor.</strong> <span class="muted">${escapeHtml(msg || "")} — otomatik yeniden denenecek.</span>`;
+      b.innerHTML = `<strong>${t("Kaynak verisi alinamiyor.")}</strong> <span class="muted">${escapeHtml(msg || "")} — ${t("otomatik yeniden denenecek.")}</span>`;
     } else if (b) {
       b.remove();
     }
@@ -28,7 +28,7 @@
       render(r);
     } catch (e) {
       failStreak++;
-      if (failStreak === 1) toast("Kaynak verisi alinamadi: " + e.message, "error");
+      if (failStreak === 1) toast(t("Kaynak verisi alinamadi: {m}", { m: e.message }), "error");
       setOfflineBanner(true, e.message);
       if (failStreak === 3) restartTimer(20000);
     }
@@ -45,18 +45,18 @@
 
     // CPU
     document.getElementById("vCpu").textContent = fmtNumber(h.cpu_percent, 1) + " %";
-    document.getElementById("vCpuSub").textContent = (h.cpu_count || "?") + " cekirdek";
+    document.getElementById("vCpuSub").textContent = t("{n} cekirdek", { n: h.cpu_count || "?" });
     barColor("statCpu", "vCpuBar", h.cpu_percent || 0);
     setTemp("tempCpu", h.cpu_temp_c, "cpu");
 
     // Memory
     document.getElementById("vMem").textContent = `${fmtNumber(h.memory_used_gb, 1)} / ${fmtNumber(h.memory_total_gb, 1)} GB`;
-    document.getElementById("vMemSub").textContent = fmtNumber(h.memory_percent, 1) + " % dolu";
+    document.getElementById("vMemSub").textContent = t("{p} % dolu", { p: fmtNumber(h.memory_percent, 1) });
     barColor("statMem", "vMemBar", h.memory_percent || 0);
 
     // Disk
     document.getElementById("vDisk").textContent = `${fmtNumber(h.disk_total_gb - h.disk_free_gb, 1)} / ${fmtNumber(h.disk_total_gb, 1)} GB`;
-    document.getElementById("vDiskSub").textContent = fmtNumber(h.disk_percent, 1) + " % dolu · " + fmtNumber(h.disk_free_gb, 1) + " GB bos";
+    document.getElementById("vDiskSub").textContent = t("{p} % dolu · {f} GB bos", { p: fmtNumber(h.disk_percent, 1), f: fmtNumber(h.disk_free_gb, 1) });
     barColor("statDisk", "vDiskBar", h.disk_percent || 0);
     setTemp("tempDisk", h.disk_temp_c, "disk");
 
@@ -128,7 +128,7 @@
       const cls = vramPct > 90 ? "error" : vramPct > 75 ? "warn" : "ok";
       const gauge = (window.Charts && Charts.tempGauge) ? Charts.tempGauge(g.temperature_c, "gpu") : "";
       const subBits = [];
-      if (utilPct != null) subBits.push(`kullanim %${fmtNumber(utilPct, 0)}`);
+      if (utilPct != null) subBits.push(t("kullanim %{p}", { p: fmtNumber(utilPct, 0) }));
       if (g.power_w != null) subBits.push(`${fmtNumber(g.power_w, 0)} W`);
       return `
       <div class="stat ${cls}">
@@ -140,7 +140,7 @@
           <div class="bar" style="width:${Math.min(100, vramPct)}%"></div>
         </div>
         ${utilPct != null ? `
-        <div class="muted" style="font-size:0.7rem; margin-top:0.45rem; display:flex; justify-content:space-between;"><span>GPU kullanimi</span><span>%${fmtNumber(utilPct, 0)}</span></div>
+        <div class="muted" style="font-size:0.7rem; margin-top:0.45rem; display:flex; justify-content:space-between;"><span>${t("GPU kullanimi")}</span><span>%${fmtNumber(utilPct, 0)}</span></div>
         <div class="progress" style="margin-top:0.2rem;"><div class="bar" style="width:${Math.min(100, utilPct)}%"></div></div>` : ""}
       </div>`;
     }).join("");

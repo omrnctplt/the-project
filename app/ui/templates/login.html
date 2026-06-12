@@ -9,36 +9,35 @@
       </div>
       <div>
         <div style="font-weight:600; font-size:1.05rem;">Inference Hub</div>
-        <div style="color:var(--muted); font-size:0.78rem;">Departman bazli yerel LLM gateway</div>
+        <div style="color:var(--muted); font-size:0.78rem;" data-i18n>Departman bazli yerel LLM gateway</div>
       </div>
     </div>
-    <h1 style="margin-bottom:1.25rem;">Tekrar hos geldiniz</h1>
+    <h1 style="margin-bottom:1.25rem;" data-i18n>Tekrar hos geldiniz</h1>
     <form id="loginForm">
-      <label>Kullanici adi
+      <label><span data-i18n>Kullanici adi</span>
         <input type="text" id="username" autocomplete="username" required autofocus />
       </label>
-      <label>Sifre
+      <label><span data-i18n>Sifre</span>
         <input type="password" id="password" autocomplete="current-password" required />
       </label>
-      <button type="submit" class="primary" style="width:100%; justify-content:center; margin-top:0.5rem;">Giris yap</button>
+      <button type="submit" class="primary" style="width:100%; justify-content:center; margin-top:0.5rem;" data-i18n>Giris yap</button>
       <p id="loginError" class="error hidden" role="alert" aria-live="assertive"></p>
     </form>
     <p class="muted" style="font-size:0.75rem; margin-top:0.9rem;">
-      Giris yaparak kisisel verilerinizin
-      <a href="/ui/privacy" style="color:var(--accent);">KVKK Aydinlatma Metni</a>'nde
-      aciklandigi sekilde islenmesini kabul etmis olursunuz.
+      <span data-i18n>Giris yaparak kisisel verilerinizin</span>
+      <a href="/ui/privacy" style="color:var(--accent);" data-i18n>KVKK Aydinlatma Metni</a><span data-i18n>'nde aciklandigi sekilde islenmesini kabul etmis olursunuz.</span>
     </p>
     {% if demo_mode %}
     <details style="margin-top:1.25rem;" open>
-      <summary class="muted" style="cursor:pointer;">Demo hesaplari — doldurmak icin satira tiklayin</summary>
+      <summary class="muted" style="cursor:pointer;" data-i18n>Demo hesaplari — doldurmak icin satira tiklayin</summary>
       <table class="kv demo-accounts" style="margin-top:0.5rem;">
-        <tr data-u="admin"          data-p="admin"    style="cursor:pointer;"><td>admin</td>          <td><code>admin</code> · yonetici</td></tr>
-        <tr data-u="dev_user"       data-p="dev123"   style="cursor:pointer;"><td>dev_user</td>       <td><code>dev123</code> · muhendislik</td></tr>
-        <tr data-u="hr_user"        data-p="hr123"    style="cursor:pointer;"><td>hr_user</td>        <td><code>hr123</code> · IK</td></tr>
-        <tr data-u="finance_user"   data-p="fin123"   style="cursor:pointer;"><td>finance_user</td>   <td><code>fin123</code> · finans</td></tr>
-        <tr data-u="legal_user"     data-p="legal123" style="cursor:pointer;"><td>legal_user</td>     <td><code>legal123</code> · hukuk</td></tr>
-        <tr data-u="marketing_user" data-p="mkt123"   style="cursor:pointer;"><td>marketing_user</td> <td><code>mkt123</code> · pazarlama</td></tr>
-        <tr data-u="guest"          data-p="guest"    style="cursor:pointer;"><td>guest</td>          <td><code>guest</code> · genel</td></tr>
+        <tr data-u="admin"          data-p="admin"    style="cursor:pointer;"><td>admin</td>          <td><code>admin</code> · <span data-i18n>yonetici</span></td></tr>
+        <tr data-u="dev_user"       data-p="dev123"   style="cursor:pointer;"><td>dev_user</td>       <td><code>dev123</code> · <span data-i18n>muhendislik</span></td></tr>
+        <tr data-u="hr_user"        data-p="hr123"    style="cursor:pointer;"><td>hr_user</td>        <td><code>hr123</code> · <span data-i18n>IK</span></td></tr>
+        <tr data-u="finance_user"   data-p="fin123"   style="cursor:pointer;"><td>finance_user</td>   <td><code>fin123</code> · <span data-i18n>finans</span></td></tr>
+        <tr data-u="legal_user"     data-p="legal123" style="cursor:pointer;"><td>legal_user</td>     <td><code>legal123</code> · <span data-i18n>hukuk</span></td></tr>
+        <tr data-u="marketing_user" data-p="mkt123"   style="cursor:pointer;"><td>marketing_user</td> <td><code>mkt123</code> · <span data-i18n>pazarlama</span></td></tr>
+        <tr data-u="guest"          data-p="guest"    style="cursor:pointer;"><td>guest</td>          <td><code>guest</code> · <span data-i18n>genel</span></td></tr>
       </table>
     </details>
     {% endif %}
@@ -64,7 +63,7 @@
     const username = document.getElementById("username").value.trim();
     const password = document.getElementById("password").value;
     const btn = e.target.querySelector("button");
-    btn.disabled = true; btn.textContent = "Giris yapiliyor...";
+    btn.disabled = true; btn.textContent = t("Giris yapiliyor...");
     try {
       const r = await fetch("/login", {
         method: "POST",
@@ -73,7 +72,7 @@
       });
       if (!r.ok) {
         const j = await r.json().catch(() => ({}));
-        throw new Error(j.detail || "Giris basarisiz");
+        throw new Error(j.detail || t("Giris basarisiz"));
       }
       const data = await r.json();
       localStorage.setItem("token", data.access_token);
@@ -92,7 +91,7 @@
     } catch (ex) {
       err.textContent = ex.message;
       err.classList.remove("hidden");
-      btn.disabled = false; btn.textContent = "Giris yap";
+      btn.disabled = false; btn.textContent = t("Giris yap");
     }
   });
 </script>
