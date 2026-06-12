@@ -1637,6 +1637,8 @@ body.page-chat .main-area > main {
   color: var(--text);
 }
 .gp-more { font-size: 0.72rem; font-weight: 400; color: var(--muted); }
+.gp-actions { margin-top: 0.5rem; display: flex; justify-content: flex-end; }
+.gp-actions button { font-size: 0.72rem; padding: 0.25rem 0.6rem; }
 
 /* =============================================
    Tema degistirme butonu

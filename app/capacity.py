@@ -55,6 +55,19 @@ PROFILES: dict[str, dict[str, Any]] = {
 DEFAULT_PROFILE = "balanced"
 FALLBACK_RESERVE_GB = 0.8
 
+MAX_LOADED_HARD_CAP = 8
+TYPICAL_LOADED_MODEL_GB = 6.0
+
+
+def dynamic_max_loaded(budget_total_gb: float, profile_base: int) -> int:
+    """Ayni anda bellekte tutulabilecek model sayisi butceyle olceklenir.
+
+    Profil tabani alt sinirdir; buyuk makinelerde (orn. 48 GB VRAM -> 6,
+    80 GB -> 8) farkli ekipler farkli modelleri es zamanli kullanabilir.
+    """
+    by_budget = int(budget_total_gb // TYPICAL_LOADED_MODEL_GB)
+    return max(int(profile_base), min(MAX_LOADED_HARD_CAP, by_budget))
+
 
 @dataclass
 class CapacityPlan:
@@ -244,7 +257,10 @@ def plan(
     budget_total = max(0.5, total_gb * ratio)
 
     num_parallel = int(ollama_num_parallel) if ollama_num_parallel else int(profile_cfg["num_parallel"])
-    max_loaded = int(ollama_max_loaded_models) if ollama_max_loaded_models else int(profile_cfg["max_loaded_models"])
+    max_loaded = (
+        int(ollama_max_loaded_models) if ollama_max_loaded_models
+        else dynamic_max_loaded(budget_total, profile_cfg["max_loaded_models"])
+    )
 
     plan_obj = CapacityPlan(
         accelerator=accelerator,

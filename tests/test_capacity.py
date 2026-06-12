@@ -125,3 +125,10 @@ def test_gpu_prefers_vram_budget():
     plan = capacity_mod.plan(hw, CATALOG, _cfg(profile="balanced"))
     assert plan.accelerator == "gpu"
     assert plan.budget_total_gb <= hw["gpu"]["vram_total_gb"]
+
+
+def test_dynamic_max_loaded_scales_with_budget():
+    assert capacity_mod.dynamic_max_loaded(2.2, 1) == 1
+    assert capacity_mod.dynamic_max_loaded(12.8, 2) == 2
+    assert capacity_mod.dynamic_max_loaded(38.4, 2) == 6
+    assert capacity_mod.dynamic_max_loaded(64.0, 2) == 8

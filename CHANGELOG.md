@@ -2,6 +2,19 @@
 
 Tum dikkat ceken degisiklikler bu dosyada listelenir. Format [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standardina yakindir.
 
+## [0.11.0] - 2026-06-12
+
+Coklu model es zamanliligi + tam yonetim ozgurlugu: kesif kartlarindan da iptal/kaldirma.
+
+### Added
+- **Coklu model es zamanliligi** — `max_loaded_models` artik bellek butcesiyle olcekleniyor (`dynamic_max_loaded`: ~6 GB basina +1 model, tavan 8; profil tabani alt sinir). 48 GB VRAM → 6, 80 GB → 8 model ayni anda bellekte; compose'ta `OLLAMA_MAX_LOADED_MODELS`/`OLLAMA_NUM_PARALLEL` varsayilani 0 (Ollama otomatigi: GPU basina 3 model) — eski sabit `1` kilidi kaldirildi
+- **Kesif kartlarinda tam yasam dongusu yonetimi** — canli kesif (ollama.com/HF) kartlari artik gercek model durumunu gosterir: indirme sirasinda ilerleme cubugu + "Indirmeyi iptal et", kuruluysa "Hizli test" + "Diskten kaldir" (eskiden yalnizca "Sistemde kurulu" yaziyordu, yonetim icin katalog bolumune donmek gerekiyordu)
+- **Global indirme gostergesinde iptal** — sag alttaki canli kartta admin'e tek tik "Iptal et" (sayfa degistirmeden)
+
+### Changed
+- **Web arayuzu varsayilan host portu 7070 → 9099** — 7070 AnyDesk'le, 9090 Prometheus'la cakisiyor; 9099 yaygin hicbir servisle cakismaz. Container ici port 7070 olarak kalir (`GATEWAY_PORT` ile host tarafi serbestce degistirilebilir)
+- **"Ollama'dan sil" → "Diskten kaldir"** — eylemin ne yaptigi etiketten anlasilir
+
 ## [0.10.0] - 2026-06-11
 
 Bellek kokpiti: "diskte olmak" ile "bellekte olmak" ayrimi artik tek bakista — sistem gercek anlamda yonetilebilir.

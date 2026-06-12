@@ -89,7 +89,7 @@ function Test-Port($label, $port, $envvar) {
         Ok "$label portu $port bos"
     }
 }
-Test-Port "Gateway" (Get-EnvVar GATEWAY_PORT 7070) "GATEWAY_PORT"
+Test-Port "Gateway" (Get-EnvVar GATEWAY_PORT 9099) "GATEWAY_PORT"
 Test-Port "Ollama"  (Get-EnvVar OLLAMA_PORT  11434) "OLLAMA_PORT"
 Test-Port "Prom"    (Get-EnvVar PROM_PORT    9090) "PROM_PORT"
 Test-Port "Grafana" (Get-EnvVar GRAFANA_PORT 3000) "GRAFANA_PORT"

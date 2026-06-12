@@ -33,7 +33,7 @@ services:
       - ./data:/data
       - ./config:/etc/onprem-ai:ro
     ports:
-      - "${GATEWAY_PORT:-7070}:7070"
+      - "${GATEWAY_PORT:-9099}:7070"
     depends_on:
       ollama:
         condition: service_healthy
@@ -59,8 +59,11 @@ services:
     environment:
       <<: *common-env
       OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-3m}
-      OLLAMA_NUM_PARALLEL: ${OLLAMA_NUM_PARALLEL:-1}
-      OLLAMA_MAX_LOADED_MODELS: ${OLLAMA_MAX_LOADED_MODELS:-1}
+      # 0 = Ollama otomatik secer (GPU basina 3 model / pararellik bellege gore).
+      # Buyuk makinelerde 5-8 modelin es zamanli bellekte tutulmasini saglar;
+      # sabitlemek icin .env'de sayi verin.
+      OLLAMA_NUM_PARALLEL: ${OLLAMA_NUM_PARALLEL:-0}
+      OLLAMA_MAX_LOADED_MODELS: ${OLLAMA_MAX_LOADED_MODELS:-0}
       OLLAMA_HOST: 0.0.0.0:11434
       OLLAMA_FLASH_ATTENTION: ${OLLAMA_FLASH_ATTENTION:-false}
       OLLAMA_KV_CACHE_TYPE: ${OLLAMA_KV_CACHE_TYPE:-f16}

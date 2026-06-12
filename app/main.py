@@ -135,4 +135,4 @@ async def metrics_endpoint(request: Request) -> Any:
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("app.main:app", host="0.0.0.0", port=7070, log_level=LOG_LEVEL.lower())
+    uvicorn.run("app.main:app", host="0.0.0.0", port=9099, log_level=LOG_LEVEL.lower())
