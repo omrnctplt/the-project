@@ -63,7 +63,7 @@ load_var() {
   echo "${v:-$default}"
 }
 
-GATEWAY_PORT=$(load_var GATEWAY_PORT 9099)
+GATEWAY_PORT=$(load_var GATEWAY_PORT 8888)
 OLLAMA_PORT=$(load_var OLLAMA_PORT 11434)
 PROM_PORT=$(load_var PROM_PORT 9090)
 GRAFANA_PORT=$(load_var GRAFANA_PORT 3000)

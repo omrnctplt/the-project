@@ -12,7 +12,7 @@ Coklu model es zamanliligi + tam yonetim ozgurlugu: kesif kartlarindan da iptal/
 - **Global indirme gostergesinde iptal** — sag alttaki canli kartta admin'e tek tik "Iptal et" (sayfa degistirmeden)
 
 ### Changed
-- **Web arayuzu varsayilan host portu 7070 → 9099** — 7070 AnyDesk'le, 9090 Prometheus'la cakisiyor; 9099 yaygin hicbir servisle cakismaz. Container ici port 7070 olarak kalir (`GATEWAY_PORT` ile host tarafi serbestce degistirilebilir)
+- **Web arayuzu varsayilan host portu 7070 → 8888** — 7070 AnyDesk'le, 9090 Prometheus'la cakisiyor; 8888 sade ve akilda kalir. Container ici port 7070 olarak kalir (`GATEWAY_PORT` ile host tarafi serbestce degistirilebilir)
 - **"Ollama'dan sil" → "Diskten kaldir"** — eylemin ne yaptigi etiketten anlasilir
 
 ## [0.10.0] - 2026-06-11
